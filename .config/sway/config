@@ -2,20 +2,10 @@
 include /etc/sway/config-vars.d/*
 exec dbus-update-activation-environment --systemd WAYLAND_DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP=sway
 
-output * bg /home/amesaine/.config/sway/gruvgirl.jpg fill
+# output * bg /home/amesaine/.config/sway/wallpaper/arst.jpg fill
+output * bg #000000 solid_color
 
-# dracula color palette
-set $background #282A36
-set $background2 #44475A
-set $green #89B482
-set $red #FF0000
-set $white #F8F8F2 
-set $blue #6272A4
-set $cyan #8BE9FD
-set $orange #FFB86C
-set $pink #FF79C6
-set $purple #BD93F9
-set $yellow #F1FA8C
+set $white #FFFFFF
 
 # base keybinds
 set $mod Mod4
@@ -28,97 +18,35 @@ set $right right
 # system 
 bindsym $mod+Control+q kill
 bindsym $mod+Shift+c reload
-bindsym $mod+Control+Alt+x exit
-
-# displays
-set $laptop eDP-1
-set $television 'Sony SONY TV 0x00000101'
-
-bindswitch --reload --locked lid:on output $laptop disable
-bindswitch --reload --locked lid:off output $laptop disable
-# bindswitch --reload --locked lid:off output $laptop disable
-output HDMI-A-2 pos 0 0
-output eDP-1 pos 0 1080
+bindsym $mod+Control+Shift+x exit
 
 # terminal
 set $term alacritty
-set $browser_workspace 1
-set $terminal_workspace 2
-
-bindsym $mod+Control+s exec $term --command tmux new -A -s default, workspace $terminal_workspace 
-bindsym $mod+s workspace $terminal_workspace
-
-bindsym $mod+r workspace $browser_workspace
-bindsym $mod+Control+r workspace $browser_workspace, exec brave-browser --profile-directory="Default"
-bindsym $mod+Shift+r workspace $browser_workspace, exec brave-browser --profile-directory="Profile 1"
-
-assign [app_id="Alacritty"] workspace $terminal_workspace
-assign [title="Brave"] workspace $browser_workspace 
-assign [app_id="firefox"] workspace $browser_workspace
 
 bindsym $mod+d exec sway-open-in-new-wspace desktop
 set $menu_desktop tofi-drun --ascii-input true | xargs swaymsg exec --
 bindsym $mod+Control+d exec $menu_desktop
 
+bindsym $mod+Control+f exec nautilus
 
 bindsym $mod+b exec sway-open-in-new-wspace binary
 set $menu_bin tofi-run --ascii-input true | xargs swaymsg exec --
 bindsym $mod+Control+b exec $menu_bin
-bindsym $mod+p exec sway-tofi-focus
+bindsym $mod+g exec sway-tofi-focus
 
 bindsym $mod+$left focus left
 bindsym $mod+$down focus down
 bindsym $mod+$up focus up
 bindsym $mod+$right focus right
+bindsym $mod+Control+$left move left
+bindsym $mod+Control+$down move down
+bindsym $mod+Control+$up move up
+bindsym $mod+Control+$right move right
 
-bindsym $mod+Shift+$left move left
-bindsym $mod+Shift+$down move down
-bindsym $mod+Shift+$up move up
-bindsym $mod+Shift+$right move right
+bindsym $mod+f fullscreen
 
-
-# fullscreen
-bindsym $mod+Shift+f fullscreen
-
-# Toggle the current focus between tiling and floating mode
-bindsym $mod+Shift+space floating toggle
-
-# Swap focus between the tiling area and the floating area
-bindsym $mod+space focus mode_toggle
-
-# Scratchpad:
-bindsym $mod+Control+g move scratchpad
-bindsym $mod+g scratchpad show
-
-# Resizing containers:
-bindsym $mod+Control+$left resize shrink width 250px
-bindsym $mod+Control+$down resize grow height 250px
-bindsym $mod+Control+$up resize shrink height 250px
-bindsym $mod+Control+$right resize grow width 250px
-
-bar swaybar_command waybar
-
-include /etc/sway/config.d/*
-
-# mouse / cursor
-focus_follows_mouse no
-input type:mouse {
-    accel_profile flat
-    pointer_accel 0.5
-}
-
-# touchpad
-input type:touchpad {
-    # events disabled_on_external_mouse
-    tap enabled
-    natural_scroll enabled
-    dwt enabled
-    scroll_factor 2.5
-}
-
-# keyboard
-input type:keyboard {
-    xkb_layout colejak(default)
+bar {
+    swaybar_command waybar
 }
 
 # windows
@@ -126,32 +54,22 @@ smart_borders on
 default_border pixel 3
 smart_gaps on
 gaps inner 8
+# smart_gaps inverse_outer
+# gaps outer 20
+
+include /etc/sway/config.d/*
+
 focus_on_window_activation focus
 popup_during_fullscreen leave_fullscreen
-client.focused $green $green $green $green $green 
+client.focused $white $white $white $white $white 
 
-# screenshot
-# copy to clipboard
-bindsym Print exec grimshot copy area
-bindsym Control+Print exec grimshot save area
-
-# save to file
-bindsym Shift+Print exec grimshot copy output
-bindsym Shift+Control+Print exec grimshot save output
-
-# function keys
-bindsym --locked XF86MonBrightnessUp exec brightnessctl set +5%
-bindsym --locked XF86MonBrightnessDown exec brightnessctl set 5%-
-bindsym --locked XF86AudioMute exec wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
-bindsym --locked XF86AudioLowerVolume exec wpctl set-volume @DEFAULT_AUDIO_SINK@ 10%- -l 1.2
-bindsym --locked XF86AudioRaiseVolume exec wpctl set-volume @DEFAULT_AUDIO_SINK@ 10%+ -l 1.2
-bindsym $mod+m exec wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle
-
-bindsym $mod+t exec warpd --hint
+# includes
+include ./cfg/*
 
 exec {
     sway-autotiling --limit 2
     sway-xkb-changes-border
-    alacritty --command tmux new -A -s default, workspace $terminal_workspace 
-    brave-browser --profile-directory="Default"
+    alacritty --command tmux new -A -s default, workspace $terminal
+    clickup
+    microsoft-edge, workspace $browser
 }

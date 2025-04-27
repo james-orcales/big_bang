@@ -3,7 +3,7 @@ OIL(){
     if ! [[ -z $DIR ]]; then
         cd $DIR
         zle accept-line
-        nvim +Oil .
+        nvim +Oil
     else
         zle accept-line
     fi
@@ -20,10 +20,10 @@ zle -N FZF_CONFIG
 bindkey "^@c" FZF_CONFIG
 
 FZF_GIT(){ 
-    DIR=$({ echo "/" & fd -d 1 -t d . $HOME/git } | 
+    DIR=$({ echo "/" & fd -d 1 -t d . $HOME/personal/git } | 
         xargs -n 1 basename | 
         fzf | 
-        sed "s@^@${HOME}/git/@")
+        sed "s@^@${HOME}/personal/git/@")
     OIL $DIR
 }
 zle -N FZF_GIT
@@ -39,3 +39,29 @@ FZF_DOCUMENTS(){
 zle -N FZF_DOCUMENTS
 bindkey "^@d" FZF_DOCUMENTS
 
+FZF_SCRATCH(){ 
+    DIR=$({ echo "/" & fd -d 1 -t d . $HOME/personal/git/scratch } | 
+        xargs -n 1 basename | 
+        fzf | 
+        sed "s@^@${HOME}/personal/git/scratch/@")
+    OIL $DIR
+}
+zle -N FZF_SCRATCH
+bindkey "^@s" FZF_SCRATCH
+
+FZF_WORK_GIT(){ 
+    DIR=$({ echo "/" & fd -d 1 -t d . $HOME/work/git} | 
+        xargs -n 1 basename | 
+        fzf | 
+        sed "s@^@${HOME}/work/git/@")
+    OIL $DIR
+}
+zle -N FZF_WORK_GIT
+bindkey "^@w" FZF_WORK_GIT
+
+OPEN_NVIM(){
+    cd $(pwd)
+    nvim +Oil
+}
+zle -N OPEN_NVIM
+bindkey "" OPEN_NVIM

@@ -1,12 +1,7 @@
-/*
- *  Green: #50FA7B
- *  Pink: #FF79C6
-*/
-
 * {
     border-radius: 5px;
-    font-family: "0xProto", "FontAwesome";
-    font-size: 15px;
+    font-family: "Hurmit Nerd Font Mono", "FontAwesome";
+    font-size: 18px;
     min-height: 0;
     color: @theme_text_color;
 }
@@ -30,9 +25,9 @@ window#waybar {
 }
 
 #workspaces button.focused > * {
-    background: #7daea3;
+    background: #FFF;
+    color: #000;
     padding: 0 5px;
-    color: @theme_bg_color;
 }
 
 #clock.date {
@@ -40,16 +35,8 @@ window#waybar {
     padding: 0 10px;
 }
 
-#clock.time {
-    background: @theme_bg_color;
+#memory {
     padding: 0 10px;
-    border-style: solid;
-    border-width: 2px;
-    border-color: #ebdbb2;
-}
-
-#keyboard-state label.capslock {
-    font-size: 0;
     background: @theme_bg_color;
 }
 
@@ -64,6 +51,7 @@ window#waybar {
     padding: 0 10px;
     background: @theme_bg_color;
 }
+
 
 #pulseaudio.muted {
     background: @warning_color;
@@ -83,7 +71,4 @@ window#waybar {
 #network.disconnected {
     background: @error_color;
     color: #000;
-    border-style: solid;
-    border-width: 2px;
-    border-color: #ebdbb2;
 }

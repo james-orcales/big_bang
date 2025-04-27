@@ -1,13 +1,3 @@
-# ~/.profile: executed by the command interpreter for login shells.
-# This file is not read by bash(1), if ~/.bash_profile or ~/.bash_login
-# exists.
-# see /usr/share/doc/bash/examples/startup-files for examples.
-# the files are located in the bash-doc package.
-
-# the default umask is set in /etc/profile; for setting the umask
-# for ssh logins, install and configure the libpam-umask package.
-#umask 022
-
 # if running bash
 if [ -n "$BASH_VERSION" ]; then
     # include .bashrc if it exists
@@ -26,16 +16,34 @@ if [ -d "$HOME/.local/bin" ] ; then
     PATH="$HOME/.local/bin:$PATH"
 fi
 
-export GTK_THEME=Dracula
-export XCURSOR_THEME=Bibata-Modern-Ice
+export PATH="$HOME/.config/sway/bin:$PATH"
+export PATH=$PATH:/usr/local/go/bin
+export PATH=$PATH:~/go/bin
+export XDG_CONFIG_HOME=$HOME/.config
+
 export EDITOR=nvim
-export MOZ_ENABLE_WAYLAND=1
 export XDG_CURRENT_TYPE=wayland
-export RUST_BACKTRACE=1
+export MOZ_ENABLE_WAYLAND=1
+export QT_QPA_PLATFORM=wayland
 
-# if [ "$(tty)" = "/dev/tty1" ] ; then
-#     export XDG_CURRENT_DESKTOP=sway
-#     exec sway
-# fi
+export ODIN_ROOT="$HOME/build/odin"
+source $XDG_CONFIG_HOME/fzf/config
 
-. "$HOME/.cargo/env"
+export GPG_TTY=$(tty)
+gpgconf --launch gpg-agent
+
+
+eval "$(keychain --eval --quiet id_ed25519 work_ed25519)"
+
+SOCK="/tmp/ssh-agent-$USER"
+if test $SSH_AUTH_SOCK && [ $SSH_AUTH_SOCK != $SOCK ]
+then
+    rm -f /tmp/ssh-agent-$USER
+    ln -sf $SSH_AUTH_SOCK $SOCK
+    export SSH_AUTH_SOCK=$SOCK
+fi
+
+if [ "$(tty)" = "/dev/tty1" ] ; then
+    export XDG_CURRENT_DESKTOP=sway
+    exec sway
+fi

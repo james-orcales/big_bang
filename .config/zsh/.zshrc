@@ -44,7 +44,6 @@ zstyle ':completion:*:kill:*' command 'ps -u $USER -o pid,%cpu,tty,cputime,cmd'
 
 . "$HOME/.cargo/env"
 
-source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
 source $ZDOTDIR/.zsh_aliases
 source $ZDOTDIR/.zsh_oxide

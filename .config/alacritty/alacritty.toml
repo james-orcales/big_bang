@@ -3,51 +3,16 @@ live_config_reload = true
 [env]
 TERM = "alacritty"
 
-[colors]
-draw_bold_text_with_bright_colors = false
-
-[colors.bright]
-black = "#555555"
-blue = "#D0B5F3"
-cyan = "#BCF4F5"
-green = "#97EDA2"
-magenta = "#E7A1D7"
-red = "#E1837F"
-white = "#FFFFFF"
-yellow = "#F6F6B6"
-
-[cursor]
-unfocused_hollow = true
-
-[colors.cursor]
-cursor = "#ffffff"
-text = "#000000"
-
-[colors.normal]
-black = "#282828"
-blue = "#83a598"
-cyan = "#8ec07c"
-green = "#b8bb26"
-magenta = "#d3869b"
-red = "#fb4934"
-white = "#ebdbb2"
-yellow = "#fabd2f"
-
-[colors.primary]
-background = "#000000"
-foreground = "#F8F8F2"
-
 [font]
 builtin_box_drawing = true
-size = 16
+size = 13
 
 [font.normal]
-family = "0xProtoEmoji"
+family = "Hurmit Nerd Font Mono"
 style = "Regular"
 
-[font.italic]
-family = "0xProtoEmoji"
-style = "Italic"
+[font.bold]
+style = "Regular"
 
 [keyboard]
 bindings = [
@@ -110,8 +75,83 @@ multiplier = 3
 save_to_clipboard = false
 
 [shell]
-program = "/bin/zsh"
+program = "/bin/bash"
 
 [window]
-opacity = 0.95
+# opacity = 0.95
 resize_increments = true
+
+[colors]
+draw_bold_text_with_bright_colors = false
+
+[colors.primary]
+foreground = "#e0def4"
+background = "#000000"
+dim_foreground = "#908caa"
+bright_foreground = "#e0def4"
+
+[colors.cursor]
+text = "#000000"
+cursor = "#ffffff"
+
+[colors.vi_mode_cursor]
+text = "#e0def4"
+cursor = "#524f67"
+
+[colors.search.matches]
+foreground = "#908caa"
+background = "#26233a"
+
+[colors.search.focused_match]
+foreground = "#191724"
+background = "#ebbcba"
+
+[colors.hints.start]
+foreground = "#908caa"
+background = "#1f1d2e"
+
+[colors.hints.end]
+foreground = "#6e6a86"
+background = "#1f1d2e"
+
+[colors.line_indicator]
+foreground = "None"
+background = "None"
+
+[colors.footer_bar]
+foreground = "#e0def4"
+background = "#1f1d2e"
+
+[colors.selection]
+text = "#e0def4"
+background = "#403d52"
+
+[colors.normal]
+black = "#26233a"
+red = "#eb6f92"
+green = "#31748f"
+yellow = "#f6c177"
+blue = "#9ccfd8"
+magenta = "#c4a7e7"
+cyan = "#ebbcba"
+white = "#e0def4"
+
+[colors.bright]
+black = "#6e6a86"
+red = "#eb6f92"
+green = "#31748f"
+yellow = "#f6c177"
+blue = "#9ccfd8"
+magenta = "#c4a7e7"
+cyan = "#ebbcba"
+white = "#e0def4"
+
+[colors.dim]
+black = "#6e6a86"
+red = "#eb6f92"
+green = "#31748f"
+yellow = "#f6c177"
+blue = "#9ccfd8"
+magenta = "#c4a7e7"
+cyan = "#ebbcba"
+white = "#e0def4"
