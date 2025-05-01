@@ -78,7 +78,7 @@ save_to_clipboard = false
 program = "/bin/bash"
 
 [window]
-# opacity = 0.95
+opacity = 0.95
 resize_increments = true
 
 [colors]

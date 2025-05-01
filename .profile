@@ -19,6 +19,7 @@ fi
 export PATH="$HOME/.config/sway/bin:$PATH"
 export PATH=$PATH:/usr/local/go/bin
 export PATH=$PATH:~/go/bin
+export PATH=$PATH:~/.cargo/bin
 export XDG_CONFIG_HOME=$HOME/.config
 
 export EDITOR=nvim

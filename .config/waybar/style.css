@@ -1,74 +1,98 @@
+@import "./rose-pine.css";
+
+
 * {
     border-radius: 5px;
-    font-family: "Hurmit Nerd Font Mono", "FontAwesome";
-    font-size: 18px;
+    font-family: "SF Pro Display", "FontAwesome";
+    font-size: 4mm;
     min-height: 0;
-    color: @theme_text_color;
+    color: @text;
+}
+
+#custom-lock {
+        margin: 0 5mm;
 }
 
 window#waybar {
     background: transparent;
 }
 
-#workspaces {
-    padding: 5px 10px;
-    background: @theme_bg_color;
+window#waybar > box {
+    border-radius: 8px;
+    margin: 4px 8px 8px 8px;
+    background-color: @base;
+    padding-top: 8px;
+    padding-bottom: 5px;
+    box-shadow: 4px 4px 2px 1px #101010;
 }
 
-#workspaces * {
-    font-size: 12px;
-    color: @theme_text_color;
+
+#workspaces button label {
+  font-size: 7mm;
 }
 
 #workspaces button {
-    padding: 0 5px;
+    margin: 0 5px;
+    background: @highlightMed;
+    border-radius: 9999mm;
+    min-width: 20px;
+    min-height: 10px;
+    padding: 0 2mm;
 }
 
-#workspaces button.focused > * {
-    background: #FFF;
-    color: #000;
-    padding: 0 5px;
+#workspaces button.focused {
+    min-width: 80px;
+    background-color: @pine;
+}
+
+#workspaces button.urgent {
+    background-color: @love;
+}
+
+#workspaces button.focused  {
+    background: @pine;
+    color: @base;
 }
 
 #clock.date {
-    background: @theme_bg_color;
+    background: @base;
     padding: 0 10px;
 }
 
 #memory {
     padding: 0 10px;
-    background: @theme_bg_color;
+    background: @base;
 }
 
 #keyboard-state label.capslock.locked {
     font-size: 15px;
     padding: 0 15px;
-    background: @warning_color; 
+    background: @gold; 
 }
 
 
 #pulseaudio {
     padding: 0 10px;
-    background: @theme_bg_color;
+    background: @base;
 }
 
 
 #pulseaudio.muted {
-    background: @warning_color;
+    background: @gold;
     color: #000;
 }
 
 #pulseaudio.2.source-muted {
-    background: @error_color;
-    color: #000;
+    background: @love;
+    color: @base;
 }
 
 #network {
-    background: @theme_bg_color;
+    background: @base;
     padding: 0 10px;
 }
 
 #network.disconnected {
-    background: @error_color;
-    color: #000;
+    background: @love;
+    color: @base;
 }

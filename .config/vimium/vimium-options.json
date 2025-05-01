@@ -1,15 +1,14 @@
 {
-  "keyMappings": "unmapAll\n\nmap h scrollLeft\nmap <down> scrollDown\nmap <up> scrollUp\nmap <s-right> scrollRight\nmap <s-left> scrollLeft\nmap <home> scrollToTop\nmap <end> scrollToBottom\nmap <s-down> scrollPageDown\nmap <s-up> scrollPageUp\n\n\n#focusing\nmap se focusInput\nmap t LinkHints.activateMode\nmap T LinkHints.activateModeWithQueue\nmap yt  LinkHints.activateModeToCopyLinkUrl\n\n#tabs\nmap <left> previousTab\nmap <right> nextTab\nmap <c-left> moveTabLeft\nmap <c-right> moveTabRight\nmap wt moveTabToNewWindow\n\nmap ? showHelp",
-  "linkHintCharacters": "nplseriaocm",
+  "keyMappings": "unmapAll\n\nmap h scrollLeft\nmap <down> scrollDown\nmap <up> scrollUp\nmap <s-right> scrollRight\nmap <s-left> scrollLeft\nmap <home> scrollToTop\nmap <end> scrollToBottom\nmap <s-down> scrollPageDown\nmap <s-up> scrollPageUp\n\n\n#focusing\nmap i focusInput\nmap t LinkHints.activateMode\nmap T LinkHints.activateModeWithQueue\nmap y  LinkHints.activateModeToCopyLinkUrl\n\n#tabs\nmap <left> previousTab\nmap <right> nextTab\nmap <c-left> moveTabLeft\nmap <c-right> moveTabRight\nmap wt moveTabToNewWindow\nmap sr Vomnibar.activateTabSelection\nmap b Vomnibar.activateBookmarksInNewTab\nmap B Vomnibar.activateBookmarks\nmap o Vomnibar.activateInNewTab\nmap O Vomnibar.activate\n\n\nmap ^ visitPreviousTab\n\nmap ? showHelp",
+  "linkHintCharacters": "nseriaoplfuwyqjdcxz",
   "newTabUrl": "",
   "nextPatterns": "",
   "previousPatterns": "",
   "scrollStepSize": 125,
   "grabBackFocus": true,
   "searchEngines": "",
-  "searchUrl": "",
-  "settingsVersion": "2.1.2",
-  "userDefinedLinkHintCss": "div > .vimiumHintMarker {\n/* linkhint boxes */\nbackground: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#FFF785),\n  color-stop(100%,#FFC542));\nborder: 1px solid #E3BE23;\n}\n\ndiv > .vimiumHintMarker span {\n/* linkhint text */\ncolor: black;\nfont-size: 15px;\n}\n\ndiv > .vimiumHintMarker > .matchingCharacter {\n}",
+  "settingsVersion": "2.2.1",
+  "userDefinedLinkHintCss": "/* Rose Pine Palette */\n\n:root {\n  --vimium-rose: #ebbcba;\n  --vimium-love: #eb6f92;\n  --vimium-pine: #31748f;\n  --vimium-foam: #9ccfd8;\n  --vimium-iris: #c4a7e7;\n  --vimium-text: #e0def4;\n  --vimium-high: #524f67;\n  --vimium-low: #21202e;\n  --vimium-overlay: #26233a;\n  --vimium-surface: #1f1d2e;\n  --vimium-base: #191724;\n}\n#vimiumHintMarkerContainer div.internalVimiumHintMarker, #vimiumHintMarkerContainer div.vimiumHintMarker {\n  padding: 3px 4px;\n  background: var(--vimium-love);\n  border: 1;\n  border-color: var(--vimium-surface);\n  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);\n}\n\n#vimiumHintMarkerContainer div span {\n  color: var(--vimium-surface) !important;\n  text-shadow: none;\n}\n\n#vimiumHintMarkerContainer div > .matchingCharacter {\n  opacity: 1.0;\n}\n\n#vimiumHintMarkerContainer div > .matchingCharacter ~ span {\n  color: var(--vimium-high);\n}\n\n#vomnibar {\n  background: var(--vimium-overlay);\n  border: 2px solid var(--vimium-iris);\n  animation: show 200ms cubic-bezier(0, 0, 0.2, 1) forwards;\n  max-height: calc(100vh - 70px);\n  overflow: hidden;\n}\n\n@keyframes show {\n  0% {\n    transform: translateY(50px);\n    opacity: 0;\n  }\n  100% {\n    transform: translateY(0);\n    opacity: 1;\n  }\n}\n\n#vomnibar input {\n  color: var(--vimium-text);\n  background: var(--vimium-overlay);\n  border: none;\n  height: unset;\n  padding: 16px 30px;\n}\n\n#vomnibar .vomnibarSearchArea {\n  border: none;\n  padding: unset;\n  background: var(--vimium-overlay)\n}\n\n#vomnibar ul {\n  padding: 0;\n  margin: 0;\n  background: var(--vimium-overlay);\n  border-top: 1px solid var(--vimium-low);\n}\n\n#vomnibar li {\n  padding: 10px;\n  border-bottom: 1px solid var(--vimium-low)\n}\n\n#vomnibar li .vomnibarTopHalf,\n#vomnibar li .vomnibarBottomHalf {\n  padding: 3px 0;\n}\n\n#vomnibar li .vomnibarSource {\n  color: var(--vimium-pine);\n}\n\n#vomnibar li em,\n#vomnibar li .vomnibarTitle {\n  color: var(--vimium-foam);\n  font-weight: bold;\n}\n\n#vomnibar li .vomnibarUrl {\n  color: var(--vimium-rose);\n}\n\n#vomnibar li .vomnibarMatch {\n  color: var(--vimium-pine);\n  font-weight: bold;\n}\n\n#vomnibar li .vomnibarTitle .vomnibarMatch {\n  color: var(--vimium-foam);\n}\n\n#vomnibar li.vomnibarSelected {\n  background-color: var(--vimium-low);\n}\n\ndiv.vimiumHUD {\n  background: var(--vimium-overlay);\n  border: none;\n  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);\n}\n\ndiv.vimiumHUD span#hud-find-input,\ndiv.vimiumHUD .vimiumHUDSearchAreaInner {\n  color: var(--vimium-text)\n}\n\ndiv.vimiumHUD .hud-find {\n  background-color: var(--vimium-overlay);\n  border: none;\n}\n\ndiv.vimiumHUD .vimiumHUDSearchArea {\n  background-color: var(--vimium-overlay);\n}\n\nbody.vimiumBody, .vimiumBody {\n  background-color: var(--vimium-overlay) !important;\n}\n\n.vimiumBody #footerWrapper, #userDefinedLinkHintCss, #scrollStepSize, #linkHintNumbers, #newTabUrl, #nextPatterns, #previousPatterns, #searchUrl, #linkHintCharacters, #searchEngines, #keyMappings, #uploadBackup\n{\n  color: var(--vimium-text) !important;\n  background-color: var(--vimium-surface);\n}\n\n.vimiumBody #footer, .vimiumBody .remove, input[name=\"pattern\"], input[name=\"passKeys\"], #uploadBackup\n{\n  background-color: var(--vimium-surface) !important;\n  color: var(--vimium-text) !important;\n}\n\nbody.vimiumBody input {\n  border-color: var(--vimium-base);\n}\n\nbody.vimiumBody a {\n  color: var(--vimium-iris);\n}\n\nbody.vimiumBody .exclusionHeaderText, body.vimiumBody .example, body.vimiumBody .caption, body.vimiumBody header, body.vimiumBody textarea, body.vimiumBody input, body.vimiumBody label  {\n  color: var(--vimium-text) !important;\n}",
   "exclusionRules": [
     {
       "passKeys": "",
@@ -18,6 +17,14 @@
     {
       "passKeys": "",
       "pattern": "https?://docs.google.com/*"
+    },
+    {
+      "passKeys": "",
+      "pattern": "https?://jtroo.github.io/*"
+    },
+    {
+      "passKeys": "",
+      "pattern": "https?://www.nytimes.com/*"
     }
   ]
 }

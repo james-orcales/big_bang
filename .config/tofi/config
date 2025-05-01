@@ -1,4 +1,5 @@
-font = /home/amesaine/.local/share/fonts/Unknown Vendor/OpenType/0xProto/0xProto_Regular.otf
+font = /home/amesaine/.local/share/fonts/Apple/OpenType/SF Pro Display/SF_Pro_Display_Regular.otf
+
 font-size = 30
 hint-font = false
 
@@ -14,17 +15,18 @@ placeholder-background = #00000000
 placeholder-background-padding = 0
 placeholder-background-corner-radius = 0
 
+input-color = #31748f
 input-background = #00000000
 input-background-padding = 0
 input-background-corner-radius = 0
 
-# default-result-color = #FFFFFF
+default-result-color = #26233a
 default-result-background = #00000000
 default-result-background-padding = 0
 default-result-background-corner-radius = 0
 
 # Selection text
-selection-color = #A9B665
+selection-color = #FFFFFF
 selection-background = #00000000
 selection-background-padding = 0
 selection-background-corner-radius = 0

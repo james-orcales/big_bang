@@ -1,27 +1,70 @@
 # DO NOT TOUCH
+include /etc/sway/config.d/*
 include /etc/sway/config-vars.d/*
 exec dbus-update-activation-environment --systemd WAYLAND_DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP=sway
 
-# output * bg /home/amesaine/.config/sway/wallpaper/arst.jpg fill
-output * bg #000000 solid_color
-
-set $white #FFFFFF
 
 # base keybinds
 set $mod Mod4
-set $numlayer Mod5
 set $left left
 set $down down
 set $up up
 set $right right
 
+set $terminal_emulator alacritty
+
+# ======================================================================================================================
+
+bindsym --locked XF86MonBrightnessUp exec brightnessctl set +5%
+bindsym --locked XF86MonBrightnessDown exec brightnessctl set 5%-
+
+set $output_secondary 'eDP-1'
+set $output_main 'HDMI-A-2'
+
+
+# align with wdisplays
+output $output_main pos 295 0
+output $output_secondary pos 0 768
+
+# ======================================================================================================================
+
+output * background ~/Pictures/nissan-gtr.jpg fill
+
+set $workspace_clear 0
+set $workspace_browser 1
+set $workspace_terminal 2
+set $workspace_clickup 3 
+
+workspace $workspace_browser output $output_main
+workspace $workspace_terminal output $output_main
+workspace $workspace_clickup output $output_secondary
+
+
+bindsym $mod+n workspace next
+bindsym $mod+p workspace prev
+bindsym $mod+a workspace $workspace_clear
+bindsym $mod+r workspace $workspace_clickup
+bindsym $mod+s workspace $workspace_browser
+bindsym $mod+t workspace $workspace_terminal
+
+bindsym $mod+Control+Shift+s workspace $workspace_browser, exec microsoft-edge
+bindsym $mod+Control+s workspace $workspace_browser, exec firefox
+bindsym $mod+Control+t exec $terminal_emulator --command tmux new -A -s default, workspace $workspace_terminal 
+
+assign [app_id="Alacritty"] workspace $workspace_terminal
+assign [app_id="firefox"] workspace $workspace_browser
+assign [class="Microsoft-edge"] workspace $workspace_browser
+assign [class="ClickUp"] workspace $workspace_clickup
+
+# ======================================================================================================================
+
 # system 
 bindsym $mod+Control+q kill
 bindsym $mod+Shift+c reload
 bindsym $mod+Control+Shift+x exit
+bindsym $mod+Control+l exec swaylock, workspace $workspace_clear
 
 # terminal
-set $term alacritty
 
 bindsym $mod+d exec sway-open-in-new-wspace desktop
 set $menu_desktop tofi-drun --ascii-input true | xargs swaymsg exec --
@@ -52,24 +95,22 @@ bar {
 # windows
 smart_borders on
 default_border pixel 3
-smart_gaps on
-gaps inner 8
-# smart_gaps inverse_outer
-# gaps outer 20
-
-include /etc/sway/config.d/*
 
 focus_on_window_activation focus
 popup_during_fullscreen leave_fullscreen
+set $white #ffffff
 client.focused $white $white $white $white $white 
 
 # includes
+include ./cfg/display.cfg
+include ./cfg/workspace.cfg
 include ./cfg/*
+
 
 exec {
     sway-autotiling --limit 2
     sway-xkb-changes-border
-    alacritty --command tmux new -A -s default, workspace $terminal
-    clickup
-    microsoft-edge, workspace $browser
+    alacritty --command tmux new -A -s default, workspace $workspace_terminal
+    workspace_clickup
+    microsoft-edge, workspace $workspace_browser
 }

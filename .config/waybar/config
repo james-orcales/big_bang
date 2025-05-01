@@ -1,63 +1,92 @@
 {
-    "id": "WAYBAR_ARBITRARY_69",
-    "ipc": true,
-    "position": "bottom",
-    "margin-top": 10,
-    "margin-left": 10,
-    "margin-right": 10,
-    "margin-bottom": 10,
-    "spacing": 5,
-
-    "modules-left": ["clock#date"], 
-    "modules-center": ["sway/workspaces"],
-    "modules-right": ["memory", "pulseaudio#2", "pulseaudio", "network"],
-    "sway/window": {
-        "max-length": 50
-    },
-
-    "clock#date": {
-        "format": "{:%b %d %a %H:%M}",
-        "tooltip-format": "{:%c}"
-    },
-    "wlr/taskbar": {
-        "sort-by-app-id": true,
-        "format": "{icon}",
-        "icon-size": 15,
-        "icon-theme": "Papirus",
-        "tooltip-format": "{title}",
-        "on-click": "activate",
-        "on-click-middle": "close",
-    },
-
-    "memory": {
-        "interval": 30,
-        "format": "{used:0.1f}G/{total:0.1f}G "
-    },
-    "pulseaudio": {
-        "format": "{volume}% {icon}",
-        "format-bluetooth": "{volume}% {icon}",
-        "format-muted": "MUTE {icon}",
-        "format-icons": {
-            "headphone": "",
-            "default": ["", ""]
+        "id": "WAYBAR_ARBITRARY_69",
+        "ipc": true,
+        "position": "bottom",
+        "spacing": 5,
+        "modules-left": [
+                "custom/lock",
+                "wlr/taskbar"
+        ],
+        "modules-center": [
+                "sway/workspaces"
+        ],
+        "modules-right": [
+                "memory",
+                "pulseaudio#2",
+                "pulseaudio",
+                "network",
+                "clock#date"
+        ],
+        "sway/window": {
+                "max-length": 50
         },
-        "scroll-step": 10,
-        "on-click": "pavucontrol"
-    },
-    "pulseaudio#2": {
-        "format": "{format_source}",
-        "format-source-muted": "",
-        "on-click": "pavucontrol -t 4"
-    },
-    "network": {
-        "format": "{ifname}",
-        "format-wifi": "",
-        "format-ethernet": "󰊗",
-        "format-disconnected": "OFFLINE", //An empty format will hide the module.
-        "tooltip-format": "{ifname} via {gwaddr} 󰊗",
-        "tooltip-format-wifi": "{essid} ",
-        "tooltip-format-ethernet": "{ifname} ",
-        "tooltip-format-disconnected": "Disconnected",
-        "max-length": 50
-    }
+        "sway/workspaces": {
+               "persistent_workspaces": {
+                   "0": [],
+                   "1": [],
+                   "2": [],
+                   "3": []
+               },
+               "format": "{icon}",
+               "format-icons": {
+                       "0": "",
+                       "1": "󰇩",
+                       "2": "󰨞",
+                       "3": "󰒱"
+               }
+        },
+// Bugged, whole bar can trigger after on-click triggering module once
+//        "custom/lock": {
+//                "format": "",
+//                "on-click": "/home/amesaine/.config/waybar/scripts/lock.sh"
+//        },
+        "clock#date": {
+                "format": "{:%b %d %a %H:%M}",
+                "tooltip-format": "{:%c}"
+        },
+        "wlr/taskbar": {
+                "sort-by-app-id": true,
+                "format": "{icon}",
+                "icon-size": 15,
+                "icon-theme": "Papirus",
+                "tooltip-format": "{title}",
+                "on-click": "activate",
+                "on-click-middle": "close",
+        },
+        "memory": {
+                "interval": 10,
+                "format": " {used:0.1f}/{total:0.1f} GiB"
+        },
+        "pulseaudio": {
+                "format": "{icon}",
+                "tooltip-format": "{volume}% {icon}",
+                "format-bluetooth": "{icon}",
+                "format-muted": "󰝟",
+                "format-icons": {
+                        "headphone": "",
+                        "default": [
+                                "",
+                                ""
+                        ]
+                },
+                "scroll-step": 10,
+                "on-click": "pavucontrol"
+        },
+        "pulseaudio#2": {
+                "format": "",
+                "tooltip-format": "{desc} @ {volume}%",
+                "format-source-muted": "",
+                "on-click": "pavucontrol -t 4"
+        },
+        "network": {
+                "format": "{ifname}",
+                "format-wifi": "",
+                "format-ethernet": "󰊗",
+                "format-disconnected": "OFFLINE", //An empty format will hide the module.
+                "tooltip-format": "{ifname} via {gwaddr} 󰊗",
+                "tooltip-format-wifi": "{essid} ",
+                "tooltip-format-ethernet": "{ifname} ",
+                "tooltip-format-disconnected": "Disconnected",
+                "max-length": 50
+        }
 }
