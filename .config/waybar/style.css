@@ -6,6 +6,7 @@
     font-family: "SF Pro Display", "FontAwesome";
     font-size: 4mm;
     min-height: 0;
+    margin: 0;
     color: @text;
 }
 
@@ -13,19 +14,35 @@
         margin: 0 5mm;
 }
 
+#custom-calendar{
+        margin: 0 -2mm;
+        padding: 0 5mm;
+        font-size: 10mm;
+        color: @base;
+        background: @iris;
+}
+
 window#waybar {
     background: transparent;
 }
 
 window#waybar > box {
-    border-radius: 8px;
-    margin: 4px 8px 8px 8px;
-    background-color: @base;
-    padding-top: 8px;
-    padding-bottom: 5px;
-    box-shadow: 4px 4px 2px 1px #101010;
+    /*border-radius: 8px;*/
+    margin: 2mm 0mm 0mm 0mm;
+    /*background-color: @base;*/
+    /*padding-top: 8px;*/
+    /*padding-bottom: 5px;*/
+    /*box-shadow: 4px 4px 2px 1px #101010;*/
 }
 
+#workspaces {
+        background: @base;
+        border-top-left-radius: 100mm;
+        border-top-right-radius: 100mm;
+        border-bottom-left-radius: 10mm;
+        border-bottom-right-radius: 10mm;
+        padding: 3mm 7mm;
+}
 
 #workspaces button label {
   font-size: 7mm;
@@ -56,12 +73,16 @@ window#waybar > box {
 
 #clock.date {
     background: @base;
-    padding: 0 10px;
+    padding: 0 10mm 0 5mm;
+    border-top-right-radius: 100mm;
+    border-bottom-right-radius: 5mm;
 }
 
 #memory {
-    padding: 0 10px;
+    padding: 0 5mm 0 10mm;
     background: @base;
+    border-top-left-radius: 100mm;
+    border-bottom-left-radius: 5mm;
 }
 
 #keyboard-state label.capslock.locked {
@@ -72,7 +93,7 @@ window#waybar > box {
 
 
 #pulseaudio {
-    padding: 0 10px;
+    padding: 0 5mm;
     background: @base;
 }
 

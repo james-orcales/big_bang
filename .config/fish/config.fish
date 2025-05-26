@@ -1,14 +1,18 @@
 if status is-interactive
-        abbr --add --position command ls ls --color=auto --group-directories-first 
-        abbr --add --position command ll ls --color=auto --group-directories-first -l
-        abbr --add --position command la ls --color=auto --group-directories-first -a
+        abbr --add --set-cursor=!! bx bash -c \'!!\'
+        abbr --add --position anywhere errout '3>&1 1>/dev/null 2>&3 |'
 
-        abbr --add --position command n nvim .
-        abbr --add --position command cfg /usr/bin/git --git-dir=$HOME/.cfg/ --work-tree=$HOME
-        abbr --add --position command l lazygit
-        abbr --add --position command lc lazygit --git-dir=$HOME/.cfg/ --work-tree=$HOME
+        abbr --add ls ls --color=auto --group-directories-first 
+        abbr --add ll ls --color=auto --group-directories-first -l
+        abbr --add la ls --color=auto --group-directories-first -a
 
-        abbr --add --position command t zoxide_cd
+        abbr --add n nvim .
+        abbr --add cfg /usr/bin/git --git-dir=$HOME/.cfg/ --work-tree=$HOME
+        abbr --add l lazygit
+        abbr --add lc lazygit --git-dir=$HOME/.cfg/ --work-tree=$HOME
+        abbr --add gco git clone --depth=1 --no-single-branch
+
+        abbr --add t zoxide_cd
 
         bind ctrl-space,c "fzf_nvim_oil $XDG_CONFIG_HOME" repaint
         bind ctrl-space,d "fzf_nvim_oil $HOME/Documents" repaint
@@ -16,5 +20,5 @@ if status is-interactive
         bind ctrl-space,s "fzf_nvim_oil $HOME/personal/git/scratch" repaint
         bind ctrl-space,w "fzf_nvim_oil $HOME/work/git" repaint
         bind ctrl-h backward-kill-word
-        bind ctrl-w : # i dont know how to erase builtin binds
+        # bind ctrl-w : # i dont know how to erase builtin binds
 end

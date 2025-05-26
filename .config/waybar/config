@@ -5,6 +5,8 @@
         "spacing": 5,
         "modules-left": [
                 "custom/lock",
+                "custom/calendar",
+                "clock#date",
                 "wlr/taskbar"
         ],
         "modules-center": [
@@ -15,7 +17,6 @@
                 "pulseaudio#2",
                 "pulseaudio",
                 "network",
-                "clock#date"
         ],
         "sway/window": {
                 "max-length": 50
@@ -36,10 +37,14 @@
                }
         },
 // Bugged, whole bar can trigger after on-click triggering module once
-//        "custom/lock": {
-//                "format": "",
-//                "on-click": "/home/amesaine/.config/waybar/scripts/lock.sh"
-//        },
+//      "custom/lock": {
+//              "format": "",
+//              "on-click": "/home/amesaine/.config/waybar/scripts/lock.sh"
+//      },
+        "custom/calendar": {
+                "format": "",
+                "on-click": "/home/amesaine/.config/waybar/scripts/calendar.sh"
+        },
         "clock#date": {
                 "format": "{:%b %d %a %H:%M}",
                 "tooltip-format": "{:%c}"
@@ -54,8 +59,8 @@
                 "on-click-middle": "close",
         },
         "memory": {
-                "interval": 10,
-                "format": " {used:0.1f}/{total:0.1f} GiB"
+                "interval": 5,
+                "format": " {used:0.2f}/{total:0.2f} GiB"
         },
         "pulseaudio": {
                 "format": "{icon}",

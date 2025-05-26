@@ -74,6 +74,6 @@ margin-right = 0
 hide-cursor = true
 history = true
 require-match = true
-physical-keybindings = false
+# physical-keybindings = false
 multi-instance = true
 ascii-input = true

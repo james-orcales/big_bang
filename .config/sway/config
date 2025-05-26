@@ -7,14 +7,14 @@ exec dbus-update-activation-environment --systemd WAYLAND_DISPLAY SWAYSOCK XDG_C
 # =====SWAY OPTIONS=====================================================================================================
 
 output * background ~/Pictures/Wallpaper/nissan-gtr.jpg fill
+seat   * xcursor_theme Banana 48
+
 smart_borders on
 default_border pixel 3
 focus_on_window_activation focus
 popup_during_fullscreen leave_fullscreen
 
-set $white #ffffff
-client.focused $white $white $white $white $white 
-
+client.focused #ffffff #ffffff #ffffff #ffffff #ffffff 
 bar {
     swaybar_command waybar
 }
@@ -26,77 +26,74 @@ input type:mouse {
 
 input type:touchpad {
     natural_scroll enabled
-    dwt enabled
-    scroll_factor 0.3
+    dwt            enabled
+    scroll_factor  0.3
 }
 
 input type:keyboard {
-        xkb_layout colejak(numpad)
+         # xkb_layout colejak(default)
+         xkb_layout colejak(numpad)
         # xkb_layout us(basic)
 }
 
 # =====BASE VARIABLES===================================================================================================
 
-set $keyboard "1:1:AT_Translated_Set_2_keyboard" 
-
-set $output_secondary 'eDP-1'
-set $output_main 'HDMI-A-2'
-
+set $output_builtin 'eDP-1'
+set $output_external 'HDMI-A-2'
+set $output_external_office 'BenQ Corporation BenQ DL2020 AAF05114SL0'
 # align with wdisplays
-output $output_main pos 295 0
-output $output_secondary pos 0 768
+output $output_builtin         pos 0000 1080
+output $output_external_office pos 0000 0000 mode 1920x1080
 
-set $workspace_clear 0
-set $workspace_browser 1
+set $workspace_clear    0
+set $workspace_browser  1
 set $workspace_terminal 2
-set $workspace_clickup 3 
+set $workspace_clickup  3
 
-workspace $workspace_browser output $output_main
-workspace $workspace_terminal output $output_main
-workspace $workspace_clickup output $output_secondary
+workspace $workspace_browser  output $output_builtin
+workspace $workspace_clickup  output $output_builtin
+workspace $workspace_terminal output $output_external
 
-assign [app_id="Alacritty"] workspace $workspace_terminal
-assign [app_id="firefox"] workspace $workspace_browser
-assign [class="Microsoft-edge"] workspace $workspace_browser
-assign [class="ClickUp"] workspace $workspace_clickup
+assign [app_id="Alacritty"]      workspace  $workspace_terminal
+assign [app_id="firefox"]        workspace  $workspace_browser
+assign [class="Microsoft-edge"]  workspace  $workspace_browser
+assign [class="ClickUp"]         workspace  $workspace_clickup
 
-set $mod Mod4
-set $left left
-set $down down
-set $up up
+set $mod   Mod4
+set $left  left
+set $down  down
+set $up    up
 set $right right
 
 # =====KEYBINDS=========================================================================================================
 
-bindsym $mod+$left focus left
-bindsym $mod+$down focus down
-bindsym $mod+$up focus up
-bindsym $mod+$right focus right
-bindsym $mod+Control+$left move left
-bindsym $mod+Control+$down move down
-bindsym $mod+Control+$up move up
-bindsym $mod+Control+$right move right
+bindsym $mod+$up            focus up
+bindsym $mod+$down          focus down
+bindsym $mod+$left          focus left
+bindsym $mod+$right         focus right
+bindsym $mod+Control+$up    move  up
+bindsym $mod+Control+$down  move  down
+bindsym $mod+Control+$left  move  left
+bindsym $mod+Control+$right move  right
 
-bindsym $mod+Control+q kill
-bindsym $mod+Shift+c reload
+bindsym $mod+Control+q       kill
+bindsym $mod+Shift+c         reload
 bindsym $mod+Control+Shift+x exit
-bindsym $mod+Control+l workspace $workspace_clear, exec swaylock
+bindsym $mod+Control+l       exec swaylock
 
-bindsym --locked XF86MonBrightnessUp exec brightnessctl set +5%
+bindsym --locked XF86MonBrightnessUp   exec brightnessctl set +5%
 bindsym --locked XF86MonBrightnessDown exec brightnessctl set 5%-
-bindsym --locked XF86AudioMute exec wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
-bindsym --locked XF86AudioLowerVolume exec wpctl set-volume @DEFAULT_AUDIO_SINK@ 10%- -l 1.2
-bindsym --locked XF86AudioRaiseVolume exec wpctl set-volume @DEFAULT_AUDIO_SINK@ 10%+ -l 1.2
-bindsym $mod+m exec wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle
+bindsym --locked XF86AudioMute         exec wpctl set-mute   @DEFAULT_AUDIO_SINK@ toggle
+bindsym --locked XF86AudioLowerVolume  exec wpctl set-volume @DEFAULT_AUDIO_SINK@ 10%- -l 1.2
+bindsym --locked XF86AudioRaiseVolume  exec wpctl set-volume @DEFAULT_AUDIO_SINK@ 10%+ -l 1.2
+bindsym $mod+m                         exec wpctl set-mute   @DEFAULT_AUDIO_SOURCE@ toggle
 
 # copy to clipboard
-bindsym Print exec grimshot copy area
-bindsym Control+Print exec grimshot save area
+bindsym Print               exec grimshot copy area
+bindsym Shift+Print         exec grimshot copy output
 # save to file
-bindsym Shift+Print exec grimshot copy output
-bindsym Shift+Control+Print exec grimshot save output
-
-bindsym $mod+period input $keyboard xkb_switch_layout next
+bindsym Control+Print       exec grimshot save area
+bindsym Control+Shift+Print exec grimshot save output
 
 bindsym $mod+n workspace next
 bindsym $mod+p workspace prev
@@ -105,35 +102,33 @@ bindsym $mod+r workspace $workspace_clickup
 bindsym $mod+s workspace $workspace_browser
 bindsym $mod+t workspace $workspace_terminal
 
-bindsym $mod+Control+Shift+s workspace $workspace_browser, exec microsoft-edge
-bindsym $mod+Control+s workspace $workspace_browser, exec firefox
-bindsym $mod+Control+t workspace $workspace_terminal, exec $terminal_emulator --command tmux new -A -s default 
+bindsym $mod+Control+Shift+s workspace $workspace_browser,  exec microsoft-edge
+bindsym $mod+Control+s       workspace $workspace_browser,  exec firefox
+bindsym $mod+Control+t       workspace $workspace_terminal, exec alacritty --command tmux new -A -s default
+bindsym $mod+Shift+t         workspace $workspace_terminal, exec alacritty
 
-bindsym $mod+c scratchpad show
-bindsym $mod+Control+c move scratchpad
+bindsym $mod+c             scratchpad show
+bindsym $mod+Control+c     move scratchpad
 bindsym $mod+Control+space focus mode_toggle
-bindsym $mod+space floating toggle
+bindsym $mod+space         floating toggle
+bindsym $mod+f             fullscreen
 
-bindsym $mod+d exec sway-open-in-new-wspace desktop
-bindsym $mod+Control+d exec "tofi-drun --ascii-input true | xargs swaymsg exec --"
-
+bindsym $mod+d         exec sway-open-in-new-wspace desktop
+bindsym $mod+b         exec sway-open-in-new-wspace binary
+bindsym $mod+Control+d exec "swaymsg exec $(tofi-drun --ascii-input true)"
+bindsym $mod+Control+b exec "swaymsg exec $(tofi-run  --ascii-input true)"
 bindsym $mod+Control+f exec nautilus
+bindsym $mod+g         exec sway-tofi-focus
+bindsym $mod+w         exec swaync-client -t -sw
+bindsym $mod+Shift+w   exec swaync-client -R
 
-bindsym $mod+b exec sway-open-in-new-wspace binary
-bindsym $mod+Control+b exec "tofi-run --ascii-input true | xargs swaymsg exec --"
-
-bindsym $mod+g exec sway-tofi-focus
-
-bindsym $mod+f fullscreen
-
-include ./cfg/*
 
 # =====EXECUTE ON STARTUP===============================================================================================
 
 exec {
     sway-autotiling --limit 2
-    sway-xkb-changes-border
-    alacritty --command tmux new -A -s default, workspace $workspace_terminal
-    workspace_clickup
-    microsoft-edge, workspace $workspace_browser
+    alacritty --command tmux new -A -s default
+    microsoft-edge
+    workspace $workspace_clear
+    swaync
 }
