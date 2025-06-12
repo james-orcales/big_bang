@@ -6,7 +6,7 @@ exec dbus-update-activation-environment --systemd WAYLAND_DISPLAY SWAYSOCK XDG_C
 
 # =====SWAY OPTIONS=====================================================================================================
 
-output * background ~/Pictures/Wallpaper/nissan-gtr.jpg fill
+output * background #000000 solid_color
 seat   * xcursor_theme Banana 48
 
 smart_borders on
@@ -41,6 +41,7 @@ input type:keyboard {
 set $output_builtin 'eDP-1'
 set $output_external 'HDMI-A-2'
 set $output_external_office 'BenQ Corporation BenQ DL2020 AAF05114SL0'
+
 # align with wdisplays
 output $output_builtin         pos 0000 1080
 output $output_external_office pos 0000 0000 mode 1920x1080
@@ -50,9 +51,9 @@ set $workspace_browser  1
 set $workspace_terminal 2
 set $workspace_clickup  3
 
-workspace $workspace_browser  output $output_builtin
 workspace $workspace_clickup  output $output_builtin
-workspace $workspace_terminal output $output_external
+workspace $workspace_browser  output $output_external_office
+workspace $workspace_terminal output $output_external_office
 
 assign [app_id="Alacritty"]      workspace  $workspace_terminal
 assign [app_id="firefox"]        workspace  $workspace_browser
@@ -113,14 +114,19 @@ bindsym $mod+Control+space focus mode_toggle
 bindsym $mod+space         floating toggle
 bindsym $mod+f             fullscreen
 
-bindsym $mod+d         exec sway-open-in-new-wspace desktop
-bindsym $mod+b         exec sway-open-in-new-wspace binary
-bindsym $mod+Control+d exec "swaymsg exec $(tofi-drun --ascii-input true)"
-bindsym $mod+Control+b exec "swaymsg exec $(tofi-run  --ascii-input true)"
+bindsym $mod+d         exec sway-run desktop
+bindsym $mod+b         exec sway-run binary
+bindsym $mod+Control+d exec sway-run desktop new_workspace
+bindsym $mod+Control+b exec sway-run binary  new_workspace
+bindsym $mod+e         exec "tail -n +3  ~/.config/sway/emoji.txt | \
+                                tofi --placeholder-text='🔍  Pick Emoji ...' | \
+                                awk '{print $1}' | \
+                                wl-copy --type text/plain --trim-newline"
 bindsym $mod+Control+f exec nautilus
 bindsym $mod+g         exec sway-tofi-focus
 bindsym $mod+w         exec swaync-client -t -sw
 bindsym $mod+Shift+w   exec swaync-client -R
+
 
 
 # =====EXECUTE ON STARTUP===============================================================================================

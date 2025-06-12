@@ -1,0 +1,30 @@
+#!/bin/sh
+
+if [ "$1" = "desktop" ]; then
+  runner="tofi-drun"
+  placeholder="🖥️  Run Desktop Application ..."
+elif [ "$1" = "binary" ]; then
+  runner="tofi-run"
+  placeholder="📦  Run Binary ..."
+else
+  echo no argument specified
+  exit 1
+fi
+
+if [ "$2" = "new_workspace" ]; then
+  next_workspace=$(swaymsg -t get_tree |
+    jq -r 'recurse(.nodes[]) | 
+        select((.type == "workspace") and (.name | test("^[0-9]+$"))) |
+        .name' |
+    sort -n |
+    tail -n 1 |
+    awk '{print $1 + 1}')
+  swaymsg workspace "$next_workspace"
+fi
+
+to_run=$(${runner} --placeholder-text="$placeholder")
+if [ -z "$to_run" ] && [ "$2" = "new_workspace" ]; then
+  swaymsg workspace back_and_forth
+else
+  swaymsg exec -- "$to_run"
+fi

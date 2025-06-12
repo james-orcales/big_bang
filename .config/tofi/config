@@ -1,63 +1,41 @@
-font = /home/amesaine/.local/share/fonts/Apple/OpenType/SF Pro Display/SF_Pro_Display_Regular.otf
-
-font-size = 30
+font-size = 18
 hint-font = false
 
-### Text theming
-text-color = #FFFFFF
+input-color       = #e0def4
+placeholder-text  = "🔍 Search .."
+placeholder-color = #333
+prompt-text       = ""
 
-prompt-background = #00000000
-prompt-background-padding = 0
-prompt-background-corner-radius = 0
 
-placeholder-color = #FFFFFFA8
-placeholder-background = #00000000
-placeholder-background-padding = 0
-placeholder-background-corner-radius = 0
-
-input-color = #31748f
-input-background = #00000000
-input-background-padding = 0
-input-background-corner-radius = 0
-
-default-result-color = #26233a
-default-result-background = #00000000
-default-result-background-padding = 0
+default-result-color                    = #666
+default-result-background               = #000
+default-result-background-padding       = 0
 default-result-background-corner-radius = 0
+result-spacing                          = 15
 
 # Selection text
-selection-color = #FFFFFF
-selection-background = #00000000
-selection-background-padding = 0
-selection-background-corner-radius = 0
+selection-color                    = #FFFFFF
+selection-match-color              = #31748f
+selection-background               = #111
+selection-background-padding       = 10% -100%
+selection-background-corner-radius = 10%
 
-# Matching portion of selection text
-selection-match-color = #00000000
 
-#
-### Text layout
-prompt-text = ""
-prompt-padding = 0
-placeholder-text = ""
-num-results = 0
-result-spacing = 15
-
-#
 ### Window theming
-width = 100%
-height = 100%
+width            = 30%
+height           = 60%
 background-color = #000E
-outline-width = 0
-outline-color = #080800
-border-width = 0
-border-color = #6272A4
-corner-radius = 0
-padding-top = 40%
-padding-bottom = 0
-padding-left = 40%
-padding-right = 0
-clip-to-padding = true
-scale = true
+outline-width    = 0
+outline-color    = #080800
+border-width     = 0
+border-color     = #6272A4
+corner-radius    = 10%
+padding-top      = 2%
+padding-bottom   = 0
+padding-left     = 1%
+padding-right    = 0
+clip-to-padding  = true
+scale            = true
 
 ### Window positioning
 output = ""
@@ -65,15 +43,15 @@ anchor = center
 
 exclusive-zone = -1
 
-margin-top = 0
+margin-top    = 0
 margin-bottom = 0
-margin-left = 0
-margin-right = 0
+margin-left   = 0
+margin-right  = 0
 
 ### Behaviour
-hide-cursor = true
-history = true
-require-match = true
+hide-cursor            = true
+history                = true
+require-match          = true
 # physical-keybindings = false
-multi-instance = true
-ascii-input = true
+multi-instance         = true
+ascii-input            = true
