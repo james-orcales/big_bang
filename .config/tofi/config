@@ -8,7 +8,7 @@ prompt-text       = ""
 
 
 default-result-color                    = #666
-default-result-background               = #000
+default-result-background               = #000D
 default-result-background-padding       = 0
 default-result-background-corner-radius = 0
 result-spacing                          = 15
@@ -24,11 +24,11 @@ selection-background-corner-radius = 10%
 ### Window theming
 width            = 30%
 height           = 60%
-background-color = #000E
+background-color = #000
 outline-width    = 0
 outline-color    = #080800
-border-width     = 0
-border-color     = #6272A4
+border-width     = 2%
+border-color     = #AAA
 corner-radius    = 10%
 padding-top      = 2%
 padding-bottom   = 0
