@@ -1,0 +1,13 @@
+[user]
+    email = 149360196+james-orcales@users.noreply.github.com
+	name = James Orcales
+
+# Ensure that your other ssh key is added to your ssh agent
+[includeIf "gitdir:~/work/"]
+    path = ~/work/git/.gitconfig
+
+[init]
+	defaultBranch = main
+[commit]
+	gpgsign = true
+
