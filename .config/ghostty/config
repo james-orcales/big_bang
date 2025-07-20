@@ -1,0 +1,4 @@
+background = 000
+theme = rose-pine
+font-family = Iosevka
+initial-command = fish --command tmux_preset_session

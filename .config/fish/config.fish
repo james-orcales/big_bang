@@ -8,17 +8,17 @@ if status is-interactive
 
         abbr --add n nvim .
         abbr --add cfg /usr/bin/git --git-dir=$HOME/.cfg/ --work-tree=$HOME
-        abbr --add l lazygit
+        abbr --add l  lazygit
         abbr --add lc lazygit --git-dir=$HOME/.cfg/ --work-tree=$HOME
         abbr --add gco git clone --depth=1 --no-single-branch
 
         abbr --add t zoxide_cd
 
-        bind ctrl-space,c "fzf_nvim_oil $XDG_CONFIG_HOME" repaint
-        bind ctrl-space,d "fzf_nvim_oil $HOME/Documents" repaint
-        bind ctrl-space,p "fzf_nvim_oil $HOME/personal/git" repaint
-        bind ctrl-space,s "fzf_nvim_oil $HOME/personal/git/scratch" repaint
-        bind ctrl-space,w "fzf_nvim_oil $HOME/work/git" repaint
+        bind ctrl-space,c "fzf_cd $HOME/.config              && nvim ."             repaint
+        bind ctrl-space,d "fzf_cd $HOME/Documents            && nvim ."             repaint
+        bind ctrl-space,p "fzf_cd $HOME/personal/git         && tmux_preset_layout" repaint
+        bind ctrl-space,s "fzf_cd $HOME/personal/git/scratch && tmux_preset_layout" repaint
+        bind ctrl-space,w "fzf_cd $HOME/work/git/            && tmux_preset_layout" repaint
         bind ctrl-h backward-kill-word
         # bind ctrl-w : # i dont know how to erase builtin binds
 end
