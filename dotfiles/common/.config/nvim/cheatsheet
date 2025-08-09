@@ -1,0 +1,2 @@
+# delete all blank lines
+:g/^\s*$/d

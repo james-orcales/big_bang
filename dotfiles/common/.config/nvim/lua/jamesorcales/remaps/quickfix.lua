@@ -1,0 +1,6 @@
+vim.keymap.set("n", "<M-Home>", "<CMD>cfirst<CR>")
+vim.keymap.set("n", "<M-End>",  "<CMD>clast<CR>")
+vim.keymap.set("n", "<M-Down>", "<CMD>cn<CR>")
+vim.keymap.set("n", "<M-Up>",   "<CMD>cp<CR>")
+vim.keymap.set("n", "qo",       "<CMD>cope<CR>")
+vim.keymap.set("n", "qq",       "<CMD>ccl<CR>")

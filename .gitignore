@@ -1,0 +1,4 @@
+share/*
+bin/*
+Brewfile
+**/.DS_Store
