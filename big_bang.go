@@ -48,13 +48,13 @@ import (
 
 
 var (
-	HOME_DIR           string
-	BIG_BANG_ROOT      string
+	HOME              string
+	BIG_BANG_ROOT     string
 	// A mirror of the home directory but only hosts dotfiles.
-	BIG_BANG_DOTFILES  string
-	BIG_BANG_SHARE     string
-	BIG_BANG_BIN  string
-	BIG_BANG_TMP string
+	BIG_BANG_DOTFILES string
+	BIG_BANG_SHARE    string
+	BIG_BANG_BIN      string
+	BIG_BANG_TMP      string
 )
 
 
@@ -65,6 +65,83 @@ var (
 func main() {
 	artifacts := []Artifact{
 		{
+			Name: "brew",
+			Install: func(logger *Logger) {
+				if path := which("brew"); path != "" {
+					logger.Info().Msg("homebrew is already installed")
+					return 
+				}
+				logger.Info().Begin("installing")
+				defer logger.Info().Done("installing")
+				if err := shell_command(nil, "sudo", "--validate"); err != nil {
+					logger.Error(err).Msg("user must be an administrator to install homebrew")
+					return
+				}
+				if err := shell_command(
+					{"NONINTERACTIVE=1"}
+					"/bin/bash", "-c", 
+					`$(curl --fail --silent --show-error --location 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')`,
+				); err != nil {
+					logger.Error(err).Msg("user must be an administrator to install homebrew")
+					return
+				}
+			}
+		},
+		{
+			Name: "cargo",
+			Install: func(logger *Logger) {
+				already_installed := true
+				for _, dependency := range []string {
+					"rustup",
+					"cargo",
+					"rustc",
+				} {
+					if path := which(dependency); path != "" {
+						assert(filepath.IsAbs(path))
+						assert(filepath.IsAbs(BIG_BANG_ROOT))
+						already_installed = strings.HasPrefix(path, BIG_BANG_ROOT)
+						if !already_installed {
+							break
+						}
+					}
+				}
+				if already_installed {
+					return
+				}
+				logger.Info().Begin("installing")
+				defer logger.Info().Done("installing")
+
+
+				CARGO_HOME  := os.Getenv("CARGO_HOME")
+				RUSTUP_HOME := os.Getenv("RUSTUP_HOME")
+				PATH        := os.Getenv("PATH")
+				assert(filepath.IsAbs(BIG_BANG_SHARE))
+				assert(filepath.IsAbs(CARGO_HOME))
+				assert(filepath.IsAbs(RUSTUP_HOME))
+				assert(strings.HasPrefix(CARGO_HOME,  BIG_BANG_SHARE))
+				assert(strings.HasPrefix(RUSTUP_HOME, BIG_BANG_SHARE))
+				// Ideally, we want to assert that $CARGO_HOME/bin is in PATH, but this check can break with consecutive path separators. As a
+				// workaround, we assert that $CARGO_HOME is in PATH, which still gives us reasonable confidence it's correctly set.
+				assert(string.Contains(PATH, CARGO_HOME))
+
+
+				if path := which("curl"); path != "" {
+					assert(filepath.IsAbs(path))
+					assert(filepath.IsAbs(BIG_BANG_ROOT))
+					logger.Error().Msg("curl is needed to install rustup")
+					return
+				}
+				if err := shell_command(
+					"sh", "-c", 
+					`curl --proto '=https' --tlsv1.2 --silent --show-error --fail https://sh.rustup.rs | 
+					 	sh -s -- -y --no-modify-path --default-toolchain=stable`
+				); err != nil {
+					logger.Error(err).Msg("installing rustup")
+					return
+				}
+			}
+		},
+		{
 			Name:          "nvim",
 			Download_Link: "https://github.com/neovim/neovim/releases/download/v0.11.3/nvim-macos-arm64.tar.gz",
 			Checksum:      "17d22826f19fe28a11f9ab4bee13c43399fdcce485eabfa2bea6c5b3d660740f",
@@ -72,17 +149,38 @@ func main() {
 		},
 		{
 			Name:    "fish",
-			Install: func(logger *Logger) bool {
+			Install: func(logger *Logger) {
+				if path := which("fish"); path != "" {
+					assert(filepath.IsAbs(path))
+					assert(filepath.IsAbs(BIG_BANG_ROOT))
+					if strings.HasPrefix(path, BIG_BANG_ROOT) {
+						version_check := exec.Command("fish", "--version")
+						expect        := "fish, version 4.0.2-gf1456f970"
+						actual, _     := version_check.Output()
+						if actual == expect {
+							return
+						} else {
+							logger.Info().Str("current_version", actual).Str("target_version", expect).Msg("outdated installation")
+						}
+					}
+				}
+				logger.Info().Begin("installing")
+				defer logger.Info().Done("installing")
+				if path := which("cargo"); path != "" {
+					assert(filepath.IsAbs(path))
+					assert(filepath.IsAbs(BIG_BANG_SHARE))
+					if !strings.HasPrefix(path, BIG_BANG_SHARE) {
+						return
+					}
+				}
+				assert(strings.HasPrefix(BIG_BANG_SHARE, os.Getenv("CARGO_HOME")))
 				// Fabian Boehm: https://github.com/fish-shell/fish-shell/issues/10933#issuecomment-2558599433
-				cargo_install        := exec.Command("cargo",  "install", "--git", "https://github.com/fish-shell/fish-shell", "--tag", "4.0.2")
-				cargo_install.Env    = os.Environ()
-				// Note: don't quote flag values for exec.Cmd.Env.
-				cargo_install.Env    = append(cargo_install.Env, `RUSTFLAGS=-C target-feature=+crt-static`)
-				cargo_install.Stdout = os.Stdout
-				cargo_install.Stderr = os.Stderr
-				if err := cargo_install.Run(); err != nil {
-					logger.Error(err).Msg("installing")
-					return false
+				if err := shell_command(
+					{"RUSTFLAGS=-C target-feature=+crt-static"}, 
+					"cargo",  "install", "--git", "https://github.com/fish-shell/fish-shell", "--tag", "4.0.2",
+				); err != nil {
+					logger.Error(err).Msg("cargo install")
+					return
 				}
 				return true
 			},
@@ -164,12 +262,12 @@ cask "obs"
 			delete(prerequisites, dependency)
 		}
 	}
-	assert(len(prerequisites) == 0, fmt.Sprintf("%#v\n", prerequisites))
+	assert(len(prerequisites) == 0, "%#v", prerequisites)
 
 
 	var err_setup = func() error {
 		if home, err := os.UserHomeDir(); err == nil { 
-			HOME_DIR = home
+			HOME = home
 		} else {
 			return err 
 		}
@@ -181,7 +279,7 @@ cask "obs"
 
 
 		for _, dir := range []string{BIG_BANG_ROOT, BIG_BANG_DOTFILES, BIG_BANG_TMP, BIG_BANG_SHARE, BIG_BANG_BIN} {
-			assert(dir != "", "exported in $ZDOTDIR/.zprofile and sourced by big_bang.sh before calling this script")
+			assert(filepath.IsAbs(dir), "exported in $ZDOTDIR/.zprofile and sourced by big_bang.sh before calling this script")
 		}
 
 
@@ -224,9 +322,7 @@ cask "obs"
 			defer wg.Done()
 			logger_with_artifact_name := logger.With_Str("artifact", artifact.Name)
 			if artifact.Install != nil {
-				if installed := artifact.Install(logger_with_artifact_name); !installed {
-					return
-				}
+				artifact.Install(logger_with_artifact_name)
 			} else {
 				artifact_handle := download_artifact(ctx, artifact, logger_with_artifact_name)
 				if artifact_handle == nil {
@@ -236,7 +332,6 @@ cask "obs"
 					return
 				}
 			}
-			artifacts_installed += 1
 		}()
 	}
 	wg.Wait()
@@ -270,7 +365,7 @@ cask "obs"
 			if err != nil {
 				return err
 			}
-			assert(filepath.IsAbs(source_path), "")
+			assert(filepath.IsAbs(source_path))
 			if entry.IsDir() {
 				return nil
 			}
@@ -279,7 +374,7 @@ cask "obs"
 				return err
 			}
 			entry_logger := logger.With_Str("file", source_path_relative_to_home_directory)
-			destination_path := filepath.Join(HOME_DIR, source_path_relative_to_home_directory)
+			destination_path := filepath.Join(HOME, source_path_relative_to_home_directory)
 			destination_info, err := os.Lstat(destination_path)
 			if err != nil {
 				if errors.Is(err, fs.ErrNotExist) {
@@ -342,7 +437,7 @@ cask "obs"
 				dst_path := filepath.Join(dotfiles_tmp_dir, relpath)
 				src_handle, err := os.Open(src_path)
 				if err != nil {
-					assert(!errors.Is(err, fs.ErrExist), "found in the dotfile comparison")
+					assert(!errors.Is(err, fs.ErrNotExist), "found in the dotfile comparison")
 					return err
 				}
 				defer src_handle.Close()
@@ -367,7 +462,7 @@ cask "obs"
 			// TODO: checkhealth
 			for _, relpath := range mismatched_files {
 				src_path := filepath.Join(dotfiles_tmp_dir, relpath)
-				dst_path := filepath.Join(HOME_DIR, relpath)
+				dst_path := filepath.Join(HOME, relpath)
 				if err := os.MkdirAll(filepath.Dir(dst_path), 0755); err != nil {
 					return err
 				}
@@ -693,7 +788,7 @@ type Artifact struct {
 	// Useful for self-contained executables with no other files unlike Golang with its stdlib or nvim with its runtime directories.
 	// Instead of symlinking the executable to BIG_BANG_BIN, it gets moved there instead.
 	Retain_Installation_Dir bool
-	Install	func(*Logger) bool
+	Install	func(*Logger)
 	Healthcheck     []string
 }
 
@@ -705,12 +800,26 @@ func crash(format_string string, args... any) {
 func echo(format_string string, args... any) {		
 	fmt.Printf(format_string+"\n", args...)
 }
-func assert(cond bool, message string) {
+func assert(cond bool, message_and_args ...any) {
 	const (
 		stackframe_of_this_func int = iota
 		stackframe_of_the_caller_of_this_func
 	)
-	assert_location(cond, message, stackframe_of_the_caller_of_this_func)
+	if cond {
+		return
+	}
+	msg := ""
+	if len(message_and_args) > 0 {
+		if msg, is_string := string.(message_and_args[0]); is_string {
+			if len(message_and_args) > 1 {
+				args := message_and_args[1:]
+				msg = fmt.Sprintf(msg, args...)
+			}
+		} else {
+			msg = "formatting string is invalid"
+		}
+	}
+	assert_location(cond, msg, stackframe_of_the_caller_of_this_func)
 }
 func assert_location(cond bool, message string, skip int) {
 	if !cond {
@@ -774,6 +883,7 @@ func New_Logger(level int) *Logger {
 }
 
 
+// TODO: func (logger *Logger) Assert(cond bool) *Log Event { ... }
 func (logger *Logger) Debug() *Log_Event { if logger == nil || logger.Level > Log_Level_Debug { return nil } else { return init_log_event(logger, "DEBUG ") } }
 func (logger *Logger) Info()  *Log_Event { if logger == nil || logger.Level > Log_Level_Info  { return nil } else { return init_log_event(logger, "INFO  ") } }
 func (logger *Logger) Warn()  *Log_Event { if logger == nil || logger.Level > Log_Level_Warn  { return nil } else { return init_log_event(logger, "WARN  ") } }
@@ -984,7 +1094,7 @@ func (event *Log_Event) Send() {
 			}
 		}
 		return true
-	}(), "")
+	}())
 	if _, err := Log_Writer.Write(event.Buffer); err != nil {
 		Log_Writer.Write(string_to_bytes("could not write log event"))
 	}
@@ -1099,3 +1209,26 @@ func dir_exists(path string) bool {
 
 // no operation function used for explicitness
 func noop() {}
+
+
+func shell_command(environment []string, binary string, arguments ...string) error {
+	cmd := exec.Command(binary, arguments...)
+	if len(environment) > 0 {
+		cmd.Env = os.Environ()
+		cmd.Env = append(cmd.Env, environment...)
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin  = os.Stdin
+	return cmd.Run()
+}
+
+
+func which(name string) (path string) {
+	path, err := exec.Command("command", "-v", name).Output()
+	if err != nil {
+		return ""
+	}
+	assert(filepath.IsAbs(path))
+	return path
+}
