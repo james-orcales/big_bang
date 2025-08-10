@@ -1,4 +1,8 @@
 share/*
 bin/*
-Brewfile
+**/Brewfile
 **/.DS_Store
+**/.zshenv
+**/.zprofile
+# **/.profile
+# **/.bashrc

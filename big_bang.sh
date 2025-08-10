@@ -26,91 +26,203 @@ println() {
         printf '%s\n' "$*"
 }
 
-operating_system="$(uname)"
-if   test "$operating_system" = 'Darwin'; then
-	go_os='darwin'	
-elif test "$operating_system" = 'Linux' ; then
-	go_os='linux'	
-else
-	printf "Operating system is unsupported. got: $operating_system"
-	exit 1
+noop() {}
+
+
+env_setup() { 
+        operating_system="$(uname)"
+        cpu_architecture="$(uname -m)"
+        if ! { test "$operating_system" = 'Darwin' && test "$cpu_architecture" = "arm64";  } ||
+           ! { test "$operating_system" = 'Linux'  && test "$cpu_architecture" = "x86_64"; }
+        then
+                println "system is unsupported. got: $operating_system and $cpu_architecture"
+                exit 1
+        fi
+
+        # Hardcoded bash and zsh env here as their setup is essential to this script.
+        case "$operating_system" in
+        'Darwin')
+                println "setting up zsh env"
+                cat > "$HOME/.zshenv" <<'EOF'
+export BIG_BANG_ROOT="$HOME/code/big-bang/"
+export BIG_BANG_SHARE="$BIG_BANG_ROOT/share"
+export BIG_BANG_BIN="$BIG_BANG_ROOT/bin"
+export BIG_BANG_DOTFILES="$BIG_BANG_ROOT/dotfiles"
+export BIG_BANG_TMP="$BIG_BANG_ROOT/tmp"
+
+export CARGO_HOME="$BIG_BANG_SHARE/rust/.cargo"
+export RUSTUP_HOME="$BIG_BANG_SHARE/rust/.rustup"
+
+export HOMEBREW_NO_AUTO_UPDATE=true
+exit 0
+EOF
+                
+                cat > "$HOME/.zprofile" <<'EOF'
+# Place path exports in .zprofile - https://stackoverflow.com/a/34244862
+# Zsh on Arch [and OSX] sources /etc/profile – which overwrites and exports PATH – after having sourced ~/.zshenv
+export PATH="$BIG_BANG_SHARE/go/bin:$PATH"
+export PATH="$BIG_BANG_SHARE/nvim/bin:$PATH"
+export PATH="$CARGO_HOME/bin:$PATH"
+# Put BIG_BANG_BIN last for it to take priority.
+export PATH="$BIG_BANG_BIN:$PATH"
+
+if brew --version > /dev/null; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
 
+export FZF_DEFAULT_OPTS="          \
+--reverse                          \
+--ansi                             \
+--bind='ctrl-h:backward-kill-word' \
+--bind='shift-down:half-page-down' \
+--bind='shift-up:half-page-up'     \
+--bind='home:first'                \
+--bind='end:last'                  \
 
-cpu_architecture="$(uname -m)"
-if   test "$cpu_architecture" = 'arm64' ; then
-	go_arch='arm64'	
-elif test "$cpu_architecture" = 'x86_64'; then
-	if test "$operating_system" = 'Darwin'; then
-		printf 'intel macs are not supported'
-		exit 1
-	fi
-	go_arch='amd64'	
-else
-	printf "CPU architecture is unsupported. got: $cpu_architecture"
-	exit 1
+if fish --version; then
+        fish
 fi
+exit 0
+EOF
+                if ! . "$HOME/.zshenv"; then
+                        println 'failed to source .zshenv'
+                        exit 1
+                fi
+                if ! . "$HOME/.zprofile"; then
+                        println 'failed to source .zprofile'
+                        exit 1
+                fi
+                ;;
+        'Linux')
+                # TODO: hardcode .profile and .bashrc inside here
+                println "havent setup bash env setup yet"
+                exit 1
+                ;;
+        *)
+                ;;
+        esac
+
+        test  -d "$BIG_BANG_ROOT"     || { println "you must clone the repository into $BIG_BANG_ROOT"; exit 1; }
+        test  -d "$BIG_BANG_DOTFILES" || { println "$BIG_BANG_DOTFILES should've been included when you cloned the repository"; exit 1; }
+        mkdir -p "$BIG_BANG_BIN"           &&
+                mkdir -p "$BIG_BANG_SHARE" &&
+                mkdir -p "$BIG_BANG_TMP"   ||
+                { println "failed to create essential directories"; exit 1; }
+
+        return 0
+}
+
+# SSH Keys
+# https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent?platform=mac
+# TODO: The repo was cloned with https if this script was executed for the very first time. Reassign the origin to the ssh url.
+setup_ssh() {
+        cat > "$HOME/.ssh/config" <<'EOF'
+Host github.com
+  AddKeysToAgent yes
+  UseKeychain    yes # MacOS specific
+  IdentityFile   ~/.ssh/id_ed25519
+EOF
+        cat > "$HOME/.ssh/known_hosts" <<'EOF'
+github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+EOF
+        if ! test -z "$HOME/.ssh/id_ed25519" || ! test -z "$HOME/.ssh/id_ed25519.pub" ; then
+                println "Generating ssh key"
+                if ! ssh-keygen -t ed25519 -C "dja.orcales@gmail.com"; then 
+                        println "failed to generate ssh key"
+                        return 1
+                fi
+
+                # Enable ssh agent for current session (unnecessary).
+                eval "$(ssh-agent -s)"
+                ssh-add --apple-use-keychain $HOME/.ssh/id_ed25519
+
+                pbcopy < ~/.ssh/id_ed25519.pub
+                cat "~/.ssh/id_ed25519.pub"
+                println "~/.ssh/id_ed25519.pub has been copied to the clipboard."
+                println "Go to https://github.com/settings/keys and add your new key. Press [ENTER] when done."
+                read
+        fi
+        return 0
+}
 
 
+install_golang() {
+        : "${operating_system:?should be detected upon script initialization}"
+        : "${cpu_architecture:?should be detected upon script initialization}"
+        : "${BIG_BANG_ROOT:?should be exported by shell config}"
+        : "${BIG_BANG_SHARE:?should be exported by shell config}"
+        : "${BIG_BANG_TMP:?should be exported by shell config}"
+
+        go_version='1.23.12'
+        if   test "$operating_system" = "Darwin"; then
+                go_release="$go_version.darwin-arm64.tar.gz"
+                go_release_checksum='5bfa117e401ae64e7ffb960243c448b535fe007e682a13ff6c7371f4a6f0ccaa'
+                go_version_expected_output="go version go$go_version darwin/arm64"
+        elif test "$operating_system" = "Linux"; then
+                go_release="$go_version.linux-amd64.tar.gz"
+                go_release_checksum='d3847fef834e9db11bf64e3fb34db9c04db14e068eeb064f49af747010454f90'
+                go_version_expected_output="go version go$go_version linux/amd64"
+        else
+                println "invalid GOOS: $operating_system"
+                return 1
+        fi
+
+        case "$(command -v go)" in 
+        *$BIG_BANG_ROOT*)
+                go_version_actual_output="$(go version 2>/dev/null)"
+                if test "$go_version_actual_output" = "$go_version_expected_output"; then
+                        println "golang v$go_version already installed"
+                        return 0
+                fi
+                ;;
+        *)
+                println "downloading go"
+                download_location="$BIG_BANG_TMP/$go_release"
+                if ! curl --location --output "$download_location" -- "https://go.dev/dl/$go_release"; then
+                        println 'failed to download go binary'
+                        return 1
+                fi
+                if ! sha256 --quiet --check="$go_release_checksum" -- "$download_location"; then
+                        println "checksum mismatch for $go_release"
+                        return 1
+                fi
+                if ! tar --extract --gzip --file="$download_location" --directory="$BIG_BANG_SHARE"; then
+                        println "failed to extract $go_release"
+                        return 1
+                fi
+
+                if test "$(go version)" != "go version go$go_version $go_os/$go_arch"; then
+                        println "go version produced unexpected result. $(go version)"
+                        exit 1
+                fi
+
+                go env -w GOPATH="$BIG_BANG_ROOT/go-path"
+                ;;
+        esac
+
+
+        return 0
+}
+
+
+main() {
+        setup_ssh            || { println "error during ssh setup";  exit 1; }
+        env_setup            || { println "error during env setup";  exit 1; }
+        install_golang       || { println "error installing go";     exit 1; }
+        go run ./big_bang.go || { println "error running go script"; exit 1; }
+}
+
+
+main
+
+
+# TODO: move this inside golang to simplify dependency installation order
 if ! brew --version >/dev/null 2>/dev/null; then
 	sudo echo "Give current user sudo privileges. Required for homebrew installation and nix."
-	NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+	NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
 fi
-
-
-println "reseting to clean slate"
-BIG_BANG_ROOT="$HOME/code/big-bang/"
-BIG_BANG_BIN="$BIG_BANG_ROOT/bin"
-BIG_BANG_DOTFILES="$BIG_BANG_ROOT/dotfiles"
-BIG_BANG_SHARE="$BIG_BANG_ROOT/share"
-BIG_BANG_TMP="$BIG_BANG_ROOT/tmp"
-
-println "initializing big-bang directory"
-test -d "$BIG_BANG_ROOT"     || { println "you must clone the repository into $BIG_BANG_ROOT"; exit 1; }
-test -d "$BIG_BANG_DOTFILES" || { println "$BIG_BANG_DOTFILES should've been included when you cloned the repository"; exit 1; }
-mkdir -p "$BIG_BANG_BIN"
-mkdir -p "$BIG_BANG_SHARE"
-mkdir -p "$BIG_BANG_TMP"
-
-
-println "setting up zsh environment"
-ZDOTDIR="$HOME/.config/zsh"
-mkdir -p "$ZDOTDIR"
-
-big_bang_go="$BIG_BANG_BIN/go"
-go_version='1.23.11'
-expect_output="go version go$go_version $go_os/$go_arch"
-actual_output="$($big_bang_go version 2>/dev/null || true )"
-if ! test "$actual_output" != "$expect_output"; then
-	println "downloading go"
-	go_release="go$go_version.$go_os-$go_arch.tar.gz"
-	checksum='d3c2c69a79eb3e2a06e5d8bbca692c9166b27421f7251ccbafcada0ba35a05ee' # manually update this
-	download_location="$BIG_BANG_TMP/$go_release"
-	if ! curl --location --output "$download_location" -- "https://go.dev/dl/$go_release"; then
-		println 'failed to download go binary'
-		exit 1
-	fi
-	if ! sha256 --quiet --check="$checksum" -- "$download_location"; then
-		println 'invalid checksum for downloaded go release'
-		exit 1
-	fi
-	println "extracting files"
-	tar --extract --gzip --file="$download_location" --directory="$BIG_BANG_SHARE"
-
-	println "setting up go env"
-	GOROOT="$BIG_BANG_SHARE/go"
-	ln -fs "$GOROOT/bin/go"    "$BIG_BANG_BIN/go" 
-	ln -fs "$GOROOT/bin/gofmt" "$BIG_BANG_BIN/gofmt"
-	if ! test "$($big_bang_go version)" = "go version go$go_version $go_os/$go_arch"; then
-		println "go version produced unexpected result. $($big_bang_go version)"
-		exit 1
-	fi
-
-	$big_bang_go env -w GOPATH="$BIG_BANG_ROOT/go-path"
-fi
-
-source "$HOME/.zshenv"
-source "$ZDOTDIR/.zprofile"
 
 # TODO: eval $(which ...) and check if path contains BIG_BANG_ROOT
 if ! rustup --version >/dev/null 2>/dev/null || ! rustc --version >/dev/null 2>/dev/null; then
@@ -119,34 +231,3 @@ if ! rustup --version >/dev/null 2>/dev/null || ! rustc --version >/dev/null 2>/
         curl --proto '=https' --tlsv1.2 --silent --show-error --fail https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain=stable
 fi
 
-# TODO: why is this an absolute path?
-$big_bang_go run ./big_bang.go 
-
-# SSH Keys
-# https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent?platform=mac
-cat > ~/.ssh/config <<'EOF'
-Host github.com
-  AddKeysToAgent yes
-  UseKeychain    yes # MacOS specific
-  IdentityFile   ~/.ssh/id_ed25519
-EOF
-cat > ~/.ssh/known_hosts <<'EOF'
-github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
-github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
-github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
-EOF
-if ! test -z "~/.ssh/id_ed25519" || ! test -z "~/.ssh/id_ed25519.pub" ; then
-        if ! ssh-keygen -t ed25519 -C "dja.orcales@gmail.com"; then 
-                println "failed to generate ssh key"
-                exit 1
-        fi
-
-        # For current session, unnecessary.
-        eval "$(ssh-agent -s)"
-        ssh-add --apple-use-keychain ~/.ssh/id_ed25519
-
-        pbcopy < ~/.ssh/id_ed25519.pub
-        println "~/.ssh/id_ed25519.pub has been copied to the clipboard."
-        println "Go to https://github.com/settings/keys and add your new key. Press [ENTER] when done."
-        read
-fi
