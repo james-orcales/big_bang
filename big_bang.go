@@ -215,12 +215,26 @@ func main() {
 			Download_Link: "https://github.com/fastfetch-cli/fastfetch/releases/download/2.48.1/fastfetch-macos-aarch64.zip",
 			Checksum:      "a1279a5a12ab22f33bcede94108ae501c9c8b27a20629b23481f155f69b7f62d",
 		},
+		{
+			Name: "tokei",
+			Install: func() {
+				if path := which("tokei"); path != "" {
+					assert(filepath.IsAbs(path))
+					assert(filepath.IsAbs(BIG_BANG_ROOT))
+					if strings.HasPrefix(path, BIG_BANG_ROOT) {
+						break
+					}
+				}
+				logger.Info().Begin("installing")
+				defer logger.Info().Done("installing")
+				if err := shell_command(nil, "cargo", "install", "tokei", "--version=12.1.2"); err != nil {
+					logger.Error(err).Msg("cargo install")
+				}
+			}
+		},
 	}
 	brew_file := `
 brew "tmux"
-brew "tokei"
-
-
 cask "ghostty"
 cask "firefox"
 cask "microsoft-edge"
