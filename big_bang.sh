@@ -22,7 +22,9 @@
 # DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
 # OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 # NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-noop() {}
+noop() {
+	:
+}
 
 println() {
         printf '%s\n' "$*"
@@ -31,7 +33,7 @@ println() {
 env_setup() { 
         operating_system="$(uname)"
         cpu_architecture="$(uname -m)"
-        if ! { test "$operating_system" = 'Darwin' && test "$cpu_architecture" = "arm64";  } ||
+        if ! { test "$operating_system" = 'Darwin' && test "$cpu_architecture" = "arm64";  } &&
            ! { test "$operating_system" = 'Linux'  && test "$cpu_architecture" = "x86_64"; }
         then
                 println "system is unsupported. got: $operating_system and $cpu_architecture"
@@ -53,10 +55,13 @@ export CARGO_HOME="$BIG_BANG_SHARE/rust/.cargo"
 export RUSTUP_HOME="$BIG_BANG_SHARE/rust/.rustup"
 
 export HOMEBREW_NO_AUTO_UPDATE=true
-exit 0
 EOF
                 
                 cat > "$HOME/.zprofile" <<'EOF'
+if brew --version > /dev/null; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
 # Place path exports in .zprofile - https://stackoverflow.com/a/34244862
 # Zsh on Arch [and OSX] sources /etc/profile – which overwrites and exports PATH – after having sourced $HOME/.zshenv
 export PATH="$BIG_BANG_SHARE/go/bin:$PATH"
@@ -65,9 +70,6 @@ export PATH="$CARGO_HOME/bin:$PATH"
 # Put BIG_BANG_BIN last for it to take priority.
 export PATH="$BIG_BANG_BIN:$PATH"
 
-if brew --version > /dev/null; then
-        eval "$(/opt/homebrew/bin/brew shellenv)"
-fi
 
 export FZF_DEFAULT_OPTS="          \
 --reverse                          \
@@ -77,11 +79,11 @@ export FZF_DEFAULT_OPTS="          \
 --bind='shift-up:half-page-up'     \
 --bind='home:first'                \
 --bind='end:last'                  \
+"
 
-if fish --version; then
+if command -v fish >/dev/null; then
         fish
 fi
-exit 0
 EOF
                 if ! . "$HOME/.zshenv"; then
                         println 'failed to source .zshenv'
@@ -107,7 +109,7 @@ EOF
                 mkdir -p "$BIG_BANG_SHARE" &&
                 mkdir -p "$BIG_BANG_TMP"   ||
                 { println "failed to create essential directories"; exit 1; }
-
+	println "done env setup"
         return 0
 }
 
@@ -156,11 +158,11 @@ install_golang() {
 
         go_version='1.23.12'
         if   test "$operating_system" = "Darwin"; then
-                go_release="$go_version.darwin-arm64.tar.gz"
+                go_release="go$go_version.darwin-arm64.tar.gz"
                 go_release_checksum='5bfa117e401ae64e7ffb960243c448b535fe007e682a13ff6c7371f4a6f0ccaa'
                 go_version_expected_output="go version go$go_version darwin/arm64"
         elif test "$operating_system" = "Linux"; then
-                go_release="$go_version.linux-amd64.tar.gz"
+                go_release="go$go_version.linux-amd64.tar.gz"
                 go_release_checksum='d3847fef834e9db11bf64e3fb34db9c04db14e068eeb064f49af747010454f90'
                 go_version_expected_output="go version go$go_version linux/amd64"
         else
@@ -179,8 +181,9 @@ install_golang() {
         *)
                 println "downloading go"
                 download_location="$BIG_BANG_TMP/$go_release"
-                if ! curl --fail --show-error --silent --location --output "$download_location" -- "https://go.dev/dl/$go_release"; then
-                        println 'failed to download go binary'
+		download_url="https://go.dev/dl/$go_release"
+                if ! curl --fail --show-error --silent --location --output "$download_location" -- "$download_url"; then
+                        println "failed to download go binary: $download_url"
                         return 1
                 fi
                 if ! sha256 --quiet --check="$go_release_checksum" -- "$download_location"; then
@@ -192,9 +195,9 @@ install_golang() {
                         return 1
                 fi
 
-                if test "$(go version)" != "go version go$go_version $go_os/$go_arch"; then
-                        println "go version produced unexpected result. $(go version)"
-                        exit 1
+                if test "$(go version)" != "$go_version_expected_output"; then
+                        println "go version produced unexpected result. got: $(go version). expected: $go_version_expected_output"
+                        return 1
                 fi
 
                 go env -w GOPATH="$BIG_BANG_ROOT/go-path"

@@ -63,6 +63,7 @@ var (
 // TODO: CLI commands
 // TODO: Don't delete config files
 func main() {
+	// TODO: handle interdependencies
 	artifacts := []Artifact{
 		{
 			Name: "brew",
@@ -73,24 +74,25 @@ func main() {
 				}
 				logger.Info().Begin("installing")
 				defer logger.Info().Done("installing")
-				if err := shell_command(nil, "sudo", "--validate"); err != nil {
+				if err := shell_command(nil, "", "sudo", "--validate"); err != nil {
 					logger.Error(err).Msg("user must be an administrator to install homebrew")
 					return
 				}
 				if err := shell_command(
-					{"NONINTERACTIVE=1"}
+					[]string{"NONINTERACTIVE=1"},
+					"",
 					"/bin/bash", "-c", 
 					`$(curl --fail --silent --show-error --location 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')`,
 				); err != nil {
 					logger.Error(err).Msg("user must be an administrator to install homebrew")
 					return
 				}
-			}
+			},
 		},
 		{
 			Name: "cargo",
 			Install: func(logger *Logger) {
-				already_installed := true
+				has_missing_dependency := false
 				for _, dependency := range []string {
 					"rustup",
 					"cargo",
@@ -99,13 +101,16 @@ func main() {
 					if path := which(dependency); path != "" {
 						assert(filepath.IsAbs(path))
 						assert(filepath.IsAbs(BIG_BANG_ROOT))
-						already_installed = strings.HasPrefix(path, BIG_BANG_ROOT)
-						if !already_installed {
+						if !strings.HasPrefix(path, BIG_BANG_ROOT) {
+							has_missing_dependency = true
 							break
 						}
+					} else {
+						has_missing_dependency = true
+						break
 					}
 				}
-				if already_installed {
+				if !has_missing_dependency {
 					return
 				}
 				logger.Info().Begin("installing")
@@ -113,33 +118,36 @@ func main() {
 
 
 				CARGO_HOME  := os.Getenv("CARGO_HOME")
-				RUSTUP_HOME := os.Getenv("RUSTUP_HOME")
+				RUSTUP_HOME := filepath.Clean(os.Getenv("RUSTUP_HOME"))
 				PATH        := os.Getenv("PATH")
 				assert(filepath.IsAbs(BIG_BANG_SHARE))
 				assert(filepath.IsAbs(CARGO_HOME))
 				assert(filepath.IsAbs(RUSTUP_HOME))
-				assert(strings.HasPrefix(CARGO_HOME,  BIG_BANG_SHARE))
+				assert(strings.HasPrefix(filepath.Clean(CARGO_HOME),  BIG_BANG_SHARE))
 				assert(strings.HasPrefix(RUSTUP_HOME, BIG_BANG_SHARE))
 				// Ideally, we want to assert that $CARGO_HOME/bin is in PATH, but this check can break with consecutive path separators. As a
 				// workaround, we assert that $CARGO_HOME is in PATH, which still gives us reasonable confidence it's correctly set.
-				assert(string.Contains(PATH, CARGO_HOME))
+				// Also, don't clean the path here. We want CARGO_HOME to match exactly with PATH
+				assert(strings.Contains(PATH, CARGO_HOME))
 
 
-				if path := which("curl"); path != "" {
+				if path := which("curl"); path == "" {
 					assert(filepath.IsAbs(path))
 					assert(filepath.IsAbs(BIG_BANG_ROOT))
 					logger.Error().Msg("curl is needed to install rustup")
 					return
 				}
 				if err := shell_command(
-					"sh", "-c", 
+					nil, 
+					"",
+                                        "sh", "-c", 
 					`curl --proto '=https' --tlsv1.2 --silent --show-error --fail https://sh.rustup.rs | 
-					 	sh -s -- -y --no-modify-path --default-toolchain=stable`
+					 	sh -s -- -y --no-modify-path --default-toolchain=stable`,
 				); err != nil {
 					logger.Error(err).Msg("installing rustup")
 					return
 				}
-			}
+			},
 		},
 		{
 			Name:          "nvim",
@@ -157,10 +165,11 @@ func main() {
 						version_check := exec.Command("fish", "--version")
 						expect        := "fish, version 4.0.2-gf1456f970"
 						actual, _     := version_check.Output()
-						if actual == expect {
+						if slices.Equal(actual, string_to_bytes(expect)) {
 							return
 						} else {
-							logger.Info().Str("current_version", actual).Str("target_version", expect).Msg("outdated installation")
+                                                        // TODO: Info().Bytes()
+							logger.Info().Str("current_version", string(actual)).Str("target_version", expect).Msg("outdated installation")
 						}
 					}
 				}
@@ -170,19 +179,51 @@ func main() {
 					assert(filepath.IsAbs(path))
 					assert(filepath.IsAbs(BIG_BANG_SHARE))
 					if !strings.HasPrefix(path, BIG_BANG_SHARE) {
+						logger.Error().Msg("cargo installation is not within BIG_BANG_SHARE")
 						return
 					}
 				}
-				assert(strings.HasPrefix(BIG_BANG_SHARE, os.Getenv("CARGO_HOME")))
-				// Fabian Boehm: https://github.com/fish-shell/fish-shell/issues/10933#issuecomment-2558599433
+				if path := which("git"); path != "" {
+					assert(filepath.IsAbs(path))
+				}
+				assert(strings.HasPrefix(filepath.Clean(os.Getenv("CARGO_HOME")), BIG_BANG_SHARE))
+
+
+				tmp_dir := filepath.Join(BIG_BANG_TMP, "fish-shell")
+				assert(filepath.IsAbs(tmp_dir))
 				if err := shell_command(
-					{"RUSTFLAGS=-C target-feature=+crt-static"}, 
-					"cargo",  "install", "--git", "https://github.com/fish-shell/fish-shell", "--tag", "4.0.2",
+					nil,
+					"",
+					"git", "clone", "--quiet", "--depth=1", "--branch=4.0.2", "https://github.com/fish-shell/fish-shell/", tmp_dir,
+				); err != nil {
+					logger.Error(err).Msg("cloning git repo")
+					return
+				}
+				if err := shell_command(
+					nil,
+					tmp_dir,
+					"cargo", "--quiet", "vendor",
+				); err != nil {
+					logger.Error(err).Msg("cargo vendor")
+					return
+				}
+				// https://users.rust-lang.org/t/the-source-requires-a-lock-file-to-be-present-first-before-it-can-be-used-against-vendored-source-code/122648
+				if err := shell_command(
+					// Fabian Boehm: https://github.com/fish-shell/fish-shell/issues/10935#issuecomment-2558599433
+					[]string{"RUSTFLAGS=-C target-feature=+crt-static"}, 
+					tmp_dir,
+					"cargo",  "install", "--quiet", "--frozen", "--path=.",
+					// auto generated by `cargo vendor`
+					"--config", `source.crates-io.replace-with="vendored-sources"`,
+					"--config", `source."git+https://github.com/fish-shell/rust-pcre2?tag=0.2.9-utf32".git="https://github.com/fish-shell/rust-pcre2"`,
+					"--config", `source."git+https://github.com/fish-shell/rust-pcre2?tag=0.2.9-utf32".tag="0.2.9-utf32"`,
+					"--config", `source."git+https://github.com/fish-shell/rust-pcre2?tag=0.2.9-utf32".replace-with="vendored-sources"`,
+					"--config", `source.vendored-sources.directory="vendor"`,
 				); err != nil {
 					logger.Error(err).Msg("cargo install")
 					return
 				}
-				return true
+				return
 			},
 		},
 		{
@@ -217,20 +258,20 @@ func main() {
 		},
 		{
 			Name: "tokei",
-			Install: func() {
+			Install: func(logger *Logger) {
 				if path := which("tokei"); path != "" {
 					assert(filepath.IsAbs(path))
 					assert(filepath.IsAbs(BIG_BANG_ROOT))
 					if strings.HasPrefix(path, BIG_BANG_ROOT) {
-						break
+                                                return
 					}
 				}
 				logger.Info().Begin("installing")
 				defer logger.Info().Done("installing")
-				if err := shell_command(nil, "cargo", "install", "tokei", "--version=12.1.2"); err != nil {
+				if err := shell_command(nil, "", "cargo", "install", "--quiet", "tokei", "--version=12.1.2"); err != nil {
 					logger.Error(err).Msg("cargo install")
 				}
-			}
+			},
 		},
 	}
 	brew_file := `
@@ -258,7 +299,7 @@ cask "obs"
 	default: 
 		crash("os unsupported")
 	}
-	assert(runtime.Version() == "go1.23.11", "only one supported go version")
+	assert(runtime.Version() == "go1.23.12", "only one supported go version")
 
 
 	prerequisites := map[string]string{
@@ -267,9 +308,6 @@ cask "obs"
 		"curl":   "big_bang.sh: downloads golang",
 		"sha256": "big_bang.sh: checksums golang",
 		"tar":    "big_bang.sh: unpacks go<version>.tar.gz. also unpacks .xz files because go doesn't have it in the std lib. darn fish shell",
-		"rustup": "manages the rust toolchain but i dont know if this is specifically needed for cargo install",
-		"cargo":  "installs some artifacts from source",
-		"rustc":  "compiles artifacts",
 	}
 	for dependency := range prerequisites {
 		if path, _ := exec.LookPath(dependency); path != "" {
@@ -285,11 +323,11 @@ cask "obs"
 		} else {
 			return err 
 		}
-		BIG_BANG_ROOT     = os.Getenv("BIG_BANG_ROOT")
-		BIG_BANG_DOTFILES = os.Getenv("BIG_BANG_DOTFILES")
-		BIG_BANG_TMP      = os.Getenv("BIG_BANG_TMP")
-		BIG_BANG_SHARE    = os.Getenv("BIG_BANG_SHARE")
-		BIG_BANG_BIN      = os.Getenv("BIG_BANG_BIN")
+		BIG_BANG_ROOT     = filepath.Clean(os.Getenv("BIG_BANG_ROOT"))
+		BIG_BANG_DOTFILES = filepath.Clean(os.Getenv("BIG_BANG_DOTFILES"))
+		BIG_BANG_TMP      = filepath.Clean(os.Getenv("BIG_BANG_TMP"))
+		BIG_BANG_SHARE    = filepath.Clean(os.Getenv("BIG_BANG_SHARE"))
+		BIG_BANG_BIN      = filepath.Clean(os.Getenv("BIG_BANG_BIN"))
 
 
 		for _, dir := range []string{BIG_BANG_ROOT, BIG_BANG_DOTFILES, BIG_BANG_TMP, BIG_BANG_SHARE, BIG_BANG_BIN} {
@@ -371,7 +409,8 @@ cask "obs"
 
 
 	func() {
-		assert(dir_exists(BIG_BANG_DOTFILES), "")
+		return
+		assert(dir_exists(BIG_BANG_DOTFILES))
 		logger.Info().Begin("syncing dotfiles")
 		defer logger.Info().Done("syncing dotfiles")
 		mismatched_files := make([]string, 0)
@@ -392,7 +431,6 @@ cask "obs"
 			destination_info, err := os.Lstat(destination_path)
 			if err != nil {
 				if errors.Is(err, fs.ErrNotExist) {
-					entry_logger.Info().Msg("missing dotfile")
 					mismatched_files = append(mismatched_files, source_path_relative_to_home_directory)
 					return nil
 				}
@@ -403,7 +441,6 @@ cask "obs"
 					return err
 				}
 				if destination_info.Size() != source_info.Size() {
-					entry_logger.Info().Msg("mismatch contents(size)")
 					mismatched_files = append(mismatched_files, source_path_relative_to_home_directory)
 					return nil
 				} else {
@@ -824,7 +861,9 @@ func assert(cond bool, message_and_args ...any) {
 	}
 	msg := ""
 	if len(message_and_args) > 0 {
-		if msg, is_string := string.(message_and_args[0]); is_string {
+                var is_string bool
+		msg, is_string = message_and_args[0].(string)
+                if is_string {
 			if len(message_and_args) > 1 {
 				args := message_and_args[1:]
 				msg = fmt.Sprintf(msg, args...)
@@ -955,6 +994,7 @@ func (logger *Logger) With_Data_Quoted(key string, val string) *Logger {
 }
 
 
+// func (event *Log_Event) Bytes (key string, val string) *Log_Event { if event == nil { return nil }; return event.Data_Quoted(key, val) }
 func (event *Log_Event) Str (key string, val string) *Log_Event { if event == nil { return nil }; return event.Data_Quoted(key, val) }
 func (event *Log_Event) Err (err error ) *Log_Event { 
 	if event == nil { 
@@ -1225,11 +1265,16 @@ func dir_exists(path string) bool {
 func noop() {}
 
 
-func shell_command(environment []string, binary string, arguments ...string) error {
+func shell_command(environment []string, working_directory string, binary string, arguments ...string) error {
 	cmd := exec.Command(binary, arguments...)
 	if len(environment) > 0 {
 		cmd.Env = os.Environ()
 		cmd.Env = append(cmd.Env, environment...)
+	}
+	if working_directory != "" {
+		assert(filepath.IsAbs(working_directory))
+		os.MkdirAll(working_directory, 0755)
+		cmd.Dir = working_directory
 	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -1239,10 +1284,11 @@ func shell_command(environment []string, binary string, arguments ...string) err
 
 
 func which(name string) (path string) {
-	path, err := exec.Command("command", "-v", name).Output()
+	path_raw, err := exec.Command("command", "-v", name).Output()
 	if err != nil {
 		return ""
 	}
+        path = filepath.Clean(string(path_raw))
 	assert(filepath.IsAbs(path))
 	return path
 }
