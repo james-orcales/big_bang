@@ -48,16 +48,25 @@ import (
 
 
 var (
-	HOME              = filepath.Clean(os.Getenv("HOME"))
-	PATH              = os.Getenv("PATH")
-	BIG_BANG_ROOT     = filepath.Clean(os.Getenv("BIG_BANG_ROOT"))
-	//                A mirror of the home directory but only hosts dotfiles.
-	BIG_BANG_DOTFILES = filepath.Clean(os.Getenv("BIG_BANG_DOTFILES"))
-	BIG_BANG_TMP      = filepath.Clean(os.Getenv("BIG_BANG_TMP"))
-	BIG_BANG_SHARE    = filepath.Clean(os.Getenv("BIG_BANG_SHARE"))
-	BIG_BANG_BIN      = filepath.Clean(os.Getenv("BIG_BANG_BIN"))
-	CARGO_HOME        = filepath.Clean(os.Getenv("CARGO_HOME"))
-	RUSTUP_HOME       = filepath.Clean(os.Getenv("RUSTUP_HOME"))
+	HOME = filepath.Clean(os.Getenv("HOME"))
+	PATH = func() []string {
+		raw_path := os.Getenv("PATH")
+		path := filepath.SplitList(raw_path)
+		assert(len(path) > 0, "it's impossible that the PATH is empty innit?")
+		for offset, val := range path {
+			path[offset] = filepath.Clean(val)
+		}
+		return path
+	}()
+	BIG_BANG_ROOT         = filepath.Clean(os.Getenv("BIG_BANG_ROOT"))
+	// A mirror of the home directory but only hosts dotfiles.
+	BIG_BANG_DOTFILES     = filepath.Clean(os.Getenv("BIG_BANG_DOTFILES"))
+	BIG_BANG_TMP          = filepath.Clean(os.Getenv("BIG_BANG_TMP"))
+	BIG_BANG_SHARE        = filepath.Clean(os.Getenv("BIG_BANG_SHARE"))
+	BIG_BANG_BIN          = filepath.Clean(os.Getenv("BIG_BANG_BIN"))
+	CARGO_HOME            = filepath.Clean(os.Getenv("CARGO_HOME"))
+	RUSTUP_HOME           = filepath.Clean(os.Getenv("RUSTUP_HOME"))
+	HOMEBREW_BUNDLE_FILE  = filepath.Clean(os.Getenv("HOMEBREW_BUNDLE_FILE"))
 
 
 	big_bang_dotfiles_common      = filepath.Join(BIG_BANG_DOTFILES, "common")
@@ -77,29 +86,51 @@ var (
 
 // TODO: Have checksums for artifacts list and homebrew list where you're forced to update these manually just like with nix. This would need type
 // 	 Artifact to implement Stringer
-// TODO: CLI commands
+// TODO: setup ssh
 func main() {
 	artifacts := []Artifact{
 		{
 			Name: "brew",
+			System_Wide: true, 
 			Install: func(logger *Logger) {
 				if path := which("brew"); path != "" {
 					logger.Info().Msg("homebrew is already installed")
 					return 
+				} else {
+					logger.Info().Begin("installing")
+					defer logger.Info().Done("installing")
+					if err := shell_command("", nil, "sudo", "--validate"); err != nil {
+						logger.Error(err).Msg("user must be an administrator to install homebrew")
+						return
+					}
+					if err := shell_command(
+						"",
+						[]string{"NONINTERACTIVE=1"},
+						"/bin/bash", "-c", 
+						`$(curl --fail --silent --show-error --location 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')`,
+					); err != nil {
+						logger.Error(err).Msg("brew installation script")
+						return
+					}
 				}
-				logger.Info().Begin("installing")
-				defer logger.Info().Done("installing")
-				if err := shell_command(nil, "", "sudo", "--validate"); err != nil {
-					logger.Error(err).Msg("user must be an administrator to install homebrew")
+				brew_file := `
+					cask "ghostty"
+					cask "firefox"
+					cask "microsoft-edge"
+					cask "cryptomator"
+					cask "veracrypt"
+					cask "karabiner-elements"
+					cask "obs"
+				`
+				assert(filepath.IsAbs(HOMEBREW_BUNDLE_FILE))
+				if err := os.WriteFile(HOMEBREW_BUNDLE_FILE, []byte(brew_file), 0644); err != nil {
+					logger.Error(err).Msg("creating brewfile")
 					return
 				}
-				if err := shell_command(
-					[]string{"NONINTERACTIVE=1"},
-					"",
-					"/bin/bash", "-c", 
-					`$(curl --fail --silent --show-error --location 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')`,
-				); err != nil {
-					logger.Error(err).Msg("user must be an administrator to install homebrew")
+				if err := shell_command("", nil, "brew", "bundle", "check", "--file", HOMEBREW_BUNDLE_FILE); err == nil {
+					return
+				}
+				if err := shell_command("", nil, "brew", "bundle", "install", "--file", HOMEBREW_BUNDLE_FILE); err == nil {
 					return
 				}
 			},
@@ -137,10 +168,9 @@ func main() {
 				assert(filepath.IsAbs(RUSTUP_HOME))
 				assert(strings.HasPrefix(filepath.Clean(CARGO_HOME),  BIG_BANG_SHARE))
 				assert(strings.HasPrefix(RUSTUP_HOME, BIG_BANG_SHARE))
-				// Ideally, we want to assert that $CARGO_HOME/bin is in PATH, but this check can break with consecutive path separators. As a
-				// workaround, we assert that $CARGO_HOME is in PATH, which still gives us reasonable confidence it's correctly set.
-				// Also, don't clean the path here. We want CARGO_HOME to match exactly with PATH
-				assert(strings.Contains(PATH, CARGO_HOME))
+				assert(slices.Contains(
+						PATH, 
+						filepath.Clean(filepath.Join(CARGO_HOME, "bin"))))
 
 
 				if path := which("curl"); path == "" {
@@ -150,8 +180,8 @@ func main() {
 					return
 				}
 				if err := shell_command(
-					nil, 
 					"",
+					nil, 
                                         "sh", "-c", 
 					`curl --proto '=https' --tlsv1.2 --silent --show-error --fail https://sh.rustup.rs | 
 					 	sh -s -- -y --no-modify-path --default-toolchain=stable`,
@@ -198,25 +228,25 @@ func main() {
 				tmp_dir := filepath.Join(BIG_BANG_TMP, "fish-shell")
 				assert(filepath.IsAbs(tmp_dir))
 				if err := shell_command(
-					nil,
 					"",
+					nil,
 					"git", "clone", "--quiet", "--depth=1", "--branch=4.0.2", "https://github.com/fish-shell/fish-shell/", tmp_dir,
 				); err != nil {
 					logger.Error(err).Msg("cloning git repo")
 					return
 				}
 				if err := shell_command(
-					nil,
 					tmp_dir,
+					nil,
 					"cargo", "--quiet", "vendor",
 				); err != nil {
 					logger.Error(err).Msg("cargo vendor")
 					return
 				}
 				if err := shell_command(
+					tmp_dir,
 					// Fabian Boehm: https://github.com/fish-shell/fish-shell/issues/10935#issuecomment-2558599433
 					[]string{"RUSTFLAGS=-C target-feature=+crt-static"}, 
-					tmp_dir,
 					"cargo",  "install", "--quiet", "--offline", "--path=.",
 					// https://users.rust-lang.org/t/the-source-requires-a-lock-file-to-be-present-first-before-it-can-be-used-against-vendored-source-code/122648
 					"--locked",
@@ -245,7 +275,7 @@ func main() {
 				}
 				logger.Info().Begin("installing")
 				defer logger.Info().Done("installing")
-				if err := shell_command(nil, "", "cargo", "install", "--quiet", "tokei", "--version=12.1.2"); err != nil {
+				if err := shell_command("", nil, "cargo", "install", "--quiet", "tokei", "--version=12.1.2"); err != nil {
 					logger.Error(err).Msg("cargo install")
 				}
 			},
@@ -287,15 +317,6 @@ func main() {
 			Checksum:      "a1279a5a12ab22f33bcede94108ae501c9c8b27a20629b23481f155f69b7f62d",
 		},
 	}
-	brew_file := `
-cask "ghostty"
-cask "firefox"
-cask "microsoft-edge"
-cask "cryptomator"
-cask "veracrypt"
-cask "karabiner-elements"
-cask "obs"
-`
 
 
 	logger := New_Logger(Log_Level_Debug)
@@ -319,7 +340,7 @@ cask "obs"
 		"sh":     "big_bang.sh: shell to execute",
 		"curl":   "big_bang.sh: downloads golang",
 		"sha256": "big_bang.sh: checksums golang",
-		"tar":    "big_bang.sh: unpacks go<version>.tar.gz. also unpacks .xz files because go doesn't have it in the std lib. darn fish shell",
+		"tar":    "big_bang.sh: unpacks go<version>.tar.gz. also unpacks .xz files because Go doesn't have it in the std lib",
 	}
 	for dependency := range prerequisites {
 		if path, _ := exec.LookPath(dependency); path != "" {
@@ -425,14 +446,33 @@ cask "obs"
 					}
 				},
 			},
-			"dependencies_check": Info{
+			"dependencies_install":  Info{
 				description: "WIP",
 				action: func() {
-				},
-			},
-			"dependencies_sync":  Info{
-				description: "WIP",
-				action: func() {
+					total_download_time := time.Minute * 10
+					ctx, cancel := context.WithTimeout(context.Background(), total_download_time)
+					defer cancel()
+					var wg sync.WaitGroup
+					for _, artifact := range artifacts {
+						if path := which(artifact.Name); path != "" || !artifact.System_Wide && strings.HasPrefix(path, BIG_BANG_ROOT) {
+							continue
+						}
+						wg.Add(1)
+						go func() {
+							defer wg.Done()
+							logger_with_artifact_name := logger.With_Str("artifact", artifact.Name)
+							if artifact.Install != nil {
+								artifact.Install(logger_with_artifact_name)
+							} else {
+								artifact_handle := download_artifact(ctx, artifact, logger_with_artifact_name)
+								if artifact_handle == nil {
+									return
+								}
+								install_artifact(artifact, artifact_handle, logger_with_artifact_name)
+							}
+						}()
+					}
+					wg.Wait()
 				},
 			},
 		}
@@ -463,55 +503,6 @@ cask "obs"
 				os.Exit(1)
 			}
 			info.action()
-		}
-	}()
-	return
-
-
-	total_download_time := time.Minute * 10
-	ctx, cancel := context.WithTimeout(context.Background(), total_download_time)
-	defer cancel()
-	var wg sync.WaitGroup
-	artifacts_installed := 0
-	for _, artifact := range artifacts {
-		if path, _ := exec.LookPath(artifact.Name); strings.HasPrefix(path, BIG_BANG_ROOT) {
-			continue
-		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			logger_with_artifact_name := logger.With_Str("artifact", artifact.Name)
-			if artifact.Install != nil {
-				artifact.Install(logger_with_artifact_name)
-			} else {
-				artifact_handle := download_artifact(ctx, artifact, logger_with_artifact_name)
-				if artifact_handle == nil {
-					return
-				}
-				if ok := install_artifact(artifact, artifact_handle, logger_with_artifact_name); !ok {
-					return
-				}
-			}
-		}()
-	}
-	wg.Wait()
-	logger.Info().Int("artifacts.installed", artifacts_installed).Int("artifacts.total", len(artifacts)).Done("installing all artifacts!")
-
-
-	// Don't do this asynchronously.
-	func() {
-		logger.Info().Begin("installing homebrew bundle")
-		defer logger.Info().Done("installing homebrew bundle")
-		brew_file_path := filepath.Join(BIG_BANG_ROOT, "Brewfile")
-		if err := os.WriteFile(brew_file_path, string_to_bytes(brew_file), 0644); err != nil {
-			logger.Error(err).Msg("creating brewfile")
-			return
-		}
-		bundle_install := exec.Command("brew", "bundle", "install", "--file", brew_file_path)
-		bundle_install.Stdout = os.Stdout
-		bundle_install.Stderr = os.Stderr
-		if err := bundle_install.Run(); err != nil {
-			logger.Error(err).Msg("something went wrong")
 		}
 	}()
 }
@@ -908,8 +899,8 @@ type Artifact struct {
 	// Useful for self-contained executables with no other files unlike Golang with its stdlib or nvim with its runtime directories.
 	// Instead of symlinking the executable to BIG_BANG_BIN, it gets moved there instead.
 	Retain_Installation_Dir bool
+	System_Wide             bool
 	Install	func(*Logger)
-	Healthcheck     []string
 }
 
 
@@ -1340,7 +1331,7 @@ func dir_exists(path string) bool {
 func noop(_ ...string) {}
 
 
-func shell_command(environment []string, working_directory string, binary string, arguments ...string) error {
+func shell_command(working_directory string, environment []string, binary string, arguments ...string) error {
 	cmd := exec.Command(binary, arguments...)
 	if len(environment) > 0 {
 		cmd.Env = os.Environ()

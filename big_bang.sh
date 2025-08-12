@@ -42,9 +42,9 @@ env_setup() {
 
         # Hardcoded bash and zsh env here as their setup is essential to this script.
         case "$operating_system" in
-        'Darwin')
-                println "setting up zsh env"
-                cat > "$HOME/.zshenv" <<'EOF'
+        Darwin)
+                tmp_zshenv="$(mktemp)"
+                cat > "$tmp_zshenv" <<'EOF'
 export BIG_BANG_ROOT="$HOME/code/big-bang/"
 export BIG_BANG_SHARE="$BIG_BANG_ROOT/share"
 export BIG_BANG_BIN="$BIG_BANG_ROOT/bin"
@@ -55,6 +55,8 @@ export CARGO_HOME="$BIG_BANG_SHARE/rust/.cargo"
 export RUSTUP_HOME="$BIG_BANG_SHARE/rust/.rustup"
 
 export HOMEBREW_NO_AUTO_UPDATE=true
+export HOMEBREW_BUNDLE_FILE="$BIG_BANG_ROOT/Brewfile"
+export HOMEBREW_CASK_OPTS_REQUIRE_SHA=true
 
 export FZF_DEFAULT_OPTS="          \
 --reverse                          \
@@ -68,8 +70,9 @@ export FZF_DEFAULT_OPTS="          \
 
 export EDITOR=nvim
 EOF
-                
-                cat > "$HOME/.zprofile" <<'EOF'
+
+                tmp_zprofile="$(mktemp)"
+                cat > "$tmp_zprofile" <<'EOF'
 if brew --version > /dev/null; then
         eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
@@ -83,9 +86,17 @@ export PATH="$CARGO_HOME/bin:$PATH"
 export PATH="$BIG_BANG_BIN:$PATH"
 
 if command -v fish >/dev/null; then
-        fish
+        exec fish
 fi
 EOF
+                if ! cmp -z --quiet "$HOME/.zshenv" "$tmp_zshenv"; then
+                        println "updating .zshenv"
+                        mv "$tmp_zshenv" "$HOME/.zshenv"
+                fi
+                if ! cmp -z --quiet "$HOME/.zprofile" "$tmp_zprofile"; then
+                        println "updating .zprofile"
+                        mv "$tmp_zprofile" "$HOME/.zprofile"
+                fi
                 if ! . "$HOME/.zshenv"; then
                         println 'failed to source .zshenv'
                         exit 1
@@ -213,9 +224,9 @@ main() {
                 println 'you probably did not clone the repo into $HOME/code/big-bang'
                 exit 1
         fi
-        setup_ssh            || { println "error during ssh setup";  exit 1; }
         env_setup            || { println "error during env setup";  exit 1; }
         install_golang       || { println "error installing go";     exit 1; }
+        setup_ssh            || { println "error during ssh setup";  exit 1; }
         go run ./big_bang.go || { println "error running go script"; exit 1; }
 }
 
