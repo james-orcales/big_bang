@@ -56,7 +56,7 @@ var (
 	BIG_BANG_TMP      = filepath.Clean(os.Getenv("BIG_BANG_TMP"))
 	BIG_BANG_SHARE    = filepath.Clean(os.Getenv("BIG_BANG_SHARE"))
 	BIG_BANG_BIN      = filepath.Clean(os.Getenv("BIG_BANG_BIN"))
-	CARGO_HOME        = filepath.Clen(os.Getenv("CARGO_HOME"))
+	CARGO_HOME        = filepath.Clean(os.Getenv("CARGO_HOME"))
 	RUSTUP_HOME       = filepath.Clean(os.Getenv("RUSTUP_HOME"))
 
 
@@ -70,6 +70,7 @@ var (
 		default:
 			crash("unsupported os")
 		}
+		return ""
 	}()
 )
 

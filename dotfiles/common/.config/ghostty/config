@@ -1,5 +1,6 @@
-background    = 000
-theme         = rose-pine
-font-size     = 15
-window-height = 9999
-window-width  = 9999
+background          = 000
+theme               = rose-pine
+font-size           = 15
+window-height       = 9999
+window-width        = 9999
+macos-option-as-alt = true

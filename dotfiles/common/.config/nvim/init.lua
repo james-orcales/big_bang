@@ -1,4 +1,10 @@
-require('jamesorcales')
+require 'keymap'
+require 'set'
+require 'colorscheme'
+require 'autocmd'
+-- prefixed with `folke` to avoid clashing with `lazy` plugin.
+-- could also namespace the files by creating `nvim/lua/<NAMESPACE>/<module>.lua` and then `require '<NAMESPACE>' but I want to simplify the directory structure
+require 'folke_lazy'
 
 
 -- These are all of my plugins. I plan to remove lazy.nvim once Neovim 1.0 is released and plugins target this stable

@@ -1,1 +1,9 @@
 {
+        "fzf-lua":        { "branch": "main",   "commit" : "5a0581cf0d8a9336404f99a53f28472d3a8efe1a" },
+        "lazy.nvim":      { "branch": "main",   "commit" : "6c3bda4aca61a13a9c63f1c1d1b16b9d3be90d7a" },
+        "leap.nvim":      { "branch": "main",   "commit" : "02bf52e49c72cc5dabb53ec9494d10d304f0b2c9" },
+        "nvim-surround":  { "branch": "main",   "commit" : "7a7a78a52219a3312c1fcabf880cea07a7956a5f" },
+        "oil.nvim":       { "branch": "master", "commit" : "bbad9a76b2617ce1221d49619e4e4b659b3c61fc" },
+        "undotree":       { "branch": "master", "commit" : "28f2f54a34baff90ea6f4a735ef1813ad875c743" },
+        "vim-easy-align": { "branch": "master", "commit" : "9815a55dbcd817784458df7a18acacc6f82b1241" }
+}
