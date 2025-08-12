@@ -55,6 +55,18 @@ export CARGO_HOME="$BIG_BANG_SHARE/rust/.cargo"
 export RUSTUP_HOME="$BIG_BANG_SHARE/rust/.rustup"
 
 export HOMEBREW_NO_AUTO_UPDATE=true
+
+export FZF_DEFAULT_OPTS="          \
+--reverse                          \
+--ansi                             \
+--bind='ctrl-h:backward-kill-word' \
+--bind='shift-down:half-page-down' \
+--bind='shift-up:half-page-up'     \
+--bind='home:first'                \
+--bind='end:last'                  \
+"
+
+export EDITOR=nvim
 EOF
                 
                 cat > "$HOME/.zprofile" <<'EOF'
@@ -69,17 +81,6 @@ export PATH="$BIG_BANG_SHARE/nvim/bin:$PATH"
 export PATH="$CARGO_HOME/bin:$PATH"
 # Put BIG_BANG_BIN last for it to take priority.
 export PATH="$BIG_BANG_BIN:$PATH"
-
-
-export FZF_DEFAULT_OPTS="          \
---reverse                          \
---ansi                             \
---bind='ctrl-h:backward-kill-word' \
---bind='shift-down:half-page-down' \
---bind='shift-up:half-page-up'     \
---bind='home:first'                \
---bind='end:last'                  \
-"
 
 if command -v fish >/dev/null; then
         fish
@@ -208,6 +209,10 @@ install_golang() {
 
 
 main() {
+        if test "$(pwd)" != "$HOME/code/big-bang"; then
+                println 'you probably did not clone the repo into $HOME/code/big-bang'
+                exit 1
+        fi
         setup_ssh            || { println "error during ssh setup";  exit 1; }
         env_setup            || { println "error during env setup";  exit 1; }
         install_golang       || { println "error installing go";     exit 1; }
