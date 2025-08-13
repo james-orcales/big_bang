@@ -49,6 +49,7 @@ export BIG_BANG_ROOT="$HOME/code/big-bang/"
 export BIG_BANG_SHARE="$BIG_BANG_ROOT/share"
 export BIG_BANG_BIN="$BIG_BANG_ROOT/bin"
 export BIG_BANG_DOTFILES="$BIG_BANG_ROOT/dotfiles"
+export BIG_BANG_MAN="$BIG_BANG_ROOT/man"
 export BIG_BANG_TMP="$BIG_BANG_ROOT/tmp"
 
 export CARGO_HOME="$BIG_BANG_SHARE/rust/.cargo"
@@ -84,6 +85,8 @@ export PATH="$BIG_BANG_SHARE/nvim/bin:$PATH"
 export PATH="$CARGO_HOME/bin:$PATH"
 # Put BIG_BANG_BIN last for it to take priority.
 export PATH="$BIG_BANG_BIN:$PATH"
+
+export MANPATH="$BIG_BANG_MAN:$MANPATH"
 
 if command -v fish >/dev/null; then
         exec fish

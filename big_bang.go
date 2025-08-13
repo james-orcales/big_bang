@@ -77,7 +77,8 @@ var (
 		case "linux":
 			return filepath.Join(BIG_BANG_DOTFILES, "debian")
 		default:
-			crash("unsupported os")
+			fmt.Println("unsupported os")
+			os.Exit(1)
 		}
 		return ""
 	}()
@@ -88,6 +89,7 @@ var (
 // 	 Artifact to implement Stringer
 // TODO: setup ssh
 func main() {
+	// TODO: man pages. `foo.1-8``
 	artifacts := []Artifact{
 		{
 			Name: "brew",
@@ -99,12 +101,11 @@ func main() {
 				} else {
 					logger.Info().Begin("installing")
 					defer logger.Info().Done("installing")
-					if err := shell_command("", nil, "sudo", "--validate"); err != nil {
+					if err := execute("", nil, "sudo", "--validate"); err != nil {
 						logger.Error(err).Msg("user must be an administrator to install homebrew")
 						return
 					}
-					if err := shell_command(
-						"",
+					if err := execute("",
 						[]string{"NONINTERACTIVE=1"},
 						"/bin/bash", "-c", 
 						`$(curl --fail --silent --show-error --location 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')`,
@@ -127,10 +128,10 @@ func main() {
 					logger.Error(err).Msg("creating brewfile")
 					return
 				}
-				if err := shell_command("", nil, "brew", "bundle", "check", "--file", HOMEBREW_BUNDLE_FILE); err == nil {
+				if err := execute("", nil, "brew", "bundle", "check", "--file", HOMEBREW_BUNDLE_FILE); err == nil {
 					return
 				}
-				if err := shell_command("", nil, "brew", "bundle", "install", "--file", HOMEBREW_BUNDLE_FILE); err == nil {
+				if err := execute("", nil, "brew", "bundle", "install", "--file", HOMEBREW_BUNDLE_FILE); err == nil {
 					return
 				}
 			},
@@ -179,9 +180,7 @@ func main() {
 					logger.Error().Msg("curl is needed to install rustup")
 					return
 				}
-				if err := shell_command(
-					"",
-					nil, 
+				if err := execute("", nil, 
                                         "sh", "-c", 
 					`curl --proto '=https' --tlsv1.2 --silent --show-error --fail https://sh.rustup.rs | 
 					 	sh -s -- -y --no-modify-path --default-toolchain=stable`,
@@ -227,23 +226,17 @@ func main() {
 
 				tmp_dir := filepath.Join(BIG_BANG_TMP, "fish-shell")
 				assert(filepath.IsAbs(tmp_dir))
-				if err := shell_command(
-					"",
-					nil,
+				if err := execute( "", nil,
 					"git", "clone", "--quiet", "--depth=1", "--branch=4.0.2", "https://github.com/fish-shell/fish-shell/", tmp_dir,
 				); err != nil {
 					logger.Error(err).Msg("cloning git repo")
 					return
 				}
-				if err := shell_command(
-					tmp_dir,
-					nil,
-					"cargo", "--quiet", "vendor",
-				); err != nil {
+				if err := execute(tmp_dir, nil, "cargo", "--quiet", "vendor"); err != nil {
 					logger.Error(err).Msg("cargo vendor")
 					return
 				}
-				if err := shell_command(
+				if err := execute(
 					tmp_dir,
 					// Fabian Boehm: https://github.com/fish-shell/fish-shell/issues/10935#issuecomment-2558599433
 					[]string{"RUSTFLAGS=-C target-feature=+crt-static"}, 
@@ -275,7 +268,7 @@ func main() {
 				}
 				logger.Info().Begin("installing")
 				defer logger.Info().Done("installing")
-				if err := shell_command("", nil, "cargo", "install", "--quiet", "tokei", "--version=12.1.2"); err != nil {
+				if err := execute("", nil, "cargo", "install", "--quiet", "tokei", "--version=12.1.2"); err != nil {
 					logger.Error(err).Msg("cargo install")
 				}
 			},
@@ -322,15 +315,19 @@ func main() {
 	logger := New_Logger(Log_Level_Debug)
 	switch runtime.GOOS {
 	case "windows": 
-		crash("it's a cold day in hell eh?")
+		fmt.Println("it's a cold day in hell eh?")
+		os.Exit(1)
 	case "darwin":
 		if runtime.GOARCH != "arm64" {
-			crash("let that rest in peace.")
+			fmt.Println("let that rest in peace.")
+			os.Exit(1)
 		}
 	case "linux": 
-		crash("haven't tested this script here. cover x86_64 and arm64. check distro with /etc/os-release")
+		fmt.Println("haven't tested this script here. cover x86_64 and arm64. check distro with /etc/os-release")
+		os.Exit(1)
 	default: 
-		crash("os unsupported")
+		fmt.Println("os unsupported")
+		os.Exit(1)
 	}
 	assert(runtime.Version() == "go1.23.12", "only one supported go version")
 
@@ -376,7 +373,12 @@ func main() {
 		}
 		return nil
 	}()
-	defer os.RemoveAll(BIG_BANG_TMP)
+	should_cleanup_big_bang_tmp := true
+	defer func() {
+		if should_cleanup_big_bang_tmp {
+			os.RemoveAll(BIG_BANG_TMP)
+		}
+	}()
 	if err_setup != nil {
 		logger.Error(err_setup).Msg("initiliazing environment")
 		return
@@ -446,6 +448,44 @@ func main() {
 					}
 				},
 			},
+			"dependencies_download": Info{
+				description: "dependencies of which the binary can be downloaded directly will be saved in BIG_BANG_TMP",
+				action: func() {
+					should_cleanup_big_bang_tmp = false
+					var wg sync.WaitGroup
+					defer wg.Wait()
+					for _, artifact := range artifacts {
+						if artifact.Download_Link == "" {
+							continue
+						}
+						wg.Add(1)
+						go func() {
+							defer wg.Done()
+							logger := logger.With_Str("dependency", artifact.Name)
+							logger.Info().Begin("downloading")
+							defer logger.Info().Done("downloading")
+							output_dir := filepath.Join(BIG_BANG_TMP, artifact.Name)
+							if err := os.MkdirAll(output_dir, 0755); err != nil {
+								logger.Error(err).Msg("creating output-dir")
+							}
+							if err := execute("", nil,
+								"curl", 
+								"--location", 
+								"--fail-with-body", 
+								"--remote-name", 
+								"--retry", "10", 
+								"--max-time", "300", 
+								"--output-dir", output_dir,
+								"--silent",
+								artifact.Download_Link,
+							); err != nil {
+								logger.Error(err).Str("dependency", artifact.Name).Msg("failed to download dependency")
+								return
+							}
+						}()
+				 	}
+				},
+			},
 			"dependencies_install":  Info{
 				description: "WIP",
 				action: func() {
@@ -478,8 +518,8 @@ func main() {
 		}
 		var print_help = func() {
 			fmt.Println("big bang replicates NixOS reproducibility on my work machines (MacOS, Debian, NixOS).")
-			fmt.Println("Command Overview:")
 			fmt.Println("")
+			fmt.Println("Command Overview:")
 			var longest_command_length int
 			for command := range commands {
 				if len(command) > longest_command_length {
@@ -508,7 +548,7 @@ func main() {
 }
 
 
-// The returned file paths are relative to BIG_BANG_DOTFILES. Note that BIG_BANG_DOTFILES is a mirror of the home directory.
+// The returned file paths are relative to BIG_BANG_DOTFILES. Note that BIG_BANG_DOTFILES/<SUBDIR> is a mirror of the home directory.
 func mismatched_dotfiles(logger *Logger) (mismatched_files map[string]struct{}) {
 	defer func() {
 		if len(mismatched_files) > 0 {
@@ -523,31 +563,22 @@ func mismatched_dotfiles(logger *Logger) (mismatched_files map[string]struct{}) 
 	defer logger.Info().Done("finding mismatches")
 
 
-	var same_file_contents = func(a, b string) bool {
-		assert(filepath.IsAbs(a))
-		assert(filepath.IsAbs(b))
-		a_info, err := os.Lstat(a)
-		if err != nil {
-			return false
-		}
-		b_info, err := os.Lstat(b)
-		if err != nil {
-			return false
-		}
-		assert_location(!a_info.IsDir() && !b_info.IsDir(), "", 1)
-		if a_info.Size() != b_info.Size() {
-			return false
-		} else {
-			a_contents, err := os.ReadFile(a)
-			if err != nil {
-				return false
-			}
-			b_contents, err := os.ReadFile(b)
-			if err != nil {
-				return false
-			}
-			return slices.Equal(a_contents, b_contents)
-		}
+	var swap_base_dir = func(old_target, old_base, new_base string) (new_target string) {
+		assert(filepath.IsAbs(old_target))
+		assert(filepath.IsAbs(old_base))
+		assert(filepath.IsAbs(new_base))
+		old_target = filepath.Clean(old_target)
+		old_base   = filepath.Clean(old_base)
+		new_base   = filepath.Clean(new_base)
+		assert(strings.HasPrefix(old_target, old_base))
+
+
+		defer func() {
+			assert(filepath.IsAbs(new_target))
+			assert(strings.HasPrefix(new_target, new_base))
+		}()
+		target_relative_to_old_base := filepath_relative_child(old_base, old_target)
+		return filepath.Join(new_base, target_relative_to_old_base)
 	}
 
 
@@ -557,13 +588,17 @@ func mismatched_dotfiles(logger *Logger) (mismatched_files map[string]struct{}) 
 		if err != nil {
 			return err
 		}
-		src_path_relative, _ := filepath.Rel(working_directory, src_path)
-		dst_path             := filepath.Join(HOME, src_path_relative)
-		if dir_exists(src_path) || dir_exists(dst_path) {
+		if dir_exists(src_path) {
 			return nil
 		} 
-		if !same_file_contents(src_path, dst_path) {
-			mismatched_files[src_path_relative] = struct{}{}
+		dst_path := swap_base_dir(src_path, working_directory, HOME)
+		assert(strings.HasPrefix(dst_path, HOME))
+		if dir_exists(dst_path) {
+			return errors.New("expected file. got directory: "+dst_path)
+		}
+		if !file_contents_are_equal(src_path, dst_path) {
+			logger.Info().Str("file", dst_path).Str("actual", src_path).Msg("mismatch detected")
+			mismatched_files[filepath_relative_child(working_directory, src_path)] = struct{}{}
 		}
 		return nil
 	}); error_find_mismatches != nil {
@@ -575,15 +610,16 @@ func mismatched_dotfiles(logger *Logger) (mismatched_files map[string]struct{}) 
 		if err != nil {
 			return err
 		}
-		src_path_relative, _ := filepath.Rel(working_directory, src_path)
-		dst_path             := filepath.Join(HOME, src_path_relative)
-		oss_path             := filepath.Join(big_bang_dotfiles_os_specific, src_path_relative)
-		if _, err := os.Lstat(oss_path); err == nil || dir_exists(src_path) || dir_exists(dst_path) {
-			noop("skip the os-specific file which is higher priority or skip directories")
+		if dir_exists(src_path) {
 			return nil
 		} 
-		if !same_file_contents(src_path, dst_path) {
-			mismatched_files[src_path_relative] = struct{}{}
+		dst_path := swap_base_dir(src_path, working_directory, HOME)
+		oss_path := swap_base_dir(src_path, working_directory, big_bang_dotfiles_os_specific)
+		if dir_exists(dst_path) {
+			return errors.New("expected file. got directory: "+dst_path)
+		}
+		if !file_exists(oss_path) && !file_contents_are_equal(src_path, dst_path) {
+			mismatched_files[filepath_relative_child(working_directory, src_path)] = struct{}{}
 		}
 		return nil
 	}); error_find_mismatches != nil {
@@ -878,18 +914,6 @@ func os_remove_if_exists(file_path string) error {
 }
 
 
-func file_exists(path string) bool {
-	_, err := os.Lstat(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return false
-	}
-	if err != nil {
-		crash("checking if file exists: %s", err)
-	}
-	return true
-}
-
-
 type Artifact struct {
 	// the same as the executable name
 	Name              string
@@ -904,13 +928,6 @@ type Artifact struct {
 }
 
 
-func crash(format_string string, args... any) {		
-	fmt.Printf("ERROR "+format_string+"\n", args...)
-	os.Exit(1)
-}
-func echo(format_string string, args... any) {		
-	fmt.Printf(format_string+"\n", args...)
-}
 func assert(cond bool, message_and_args ...any) {
 	const (
 		stackframe_of_this_func int = iota
@@ -948,16 +965,16 @@ func assert_location(cond bool, message string, skip int) {
 
 
 /*
-https://patorjk.com/software/taag/#p=display&v=0&f=Terrace&t=logger.go
-░██                                                                                
-░██                                                                                
-░██  ░███████   ░████████  ░████████  ░███████  ░██░████      ░████████  ░███████  
-░██ ░██    ░██ ░██    ░██ ░██    ░██ ░██    ░██ ░███         ░██    ░██ ░██    ░██ 
-░██ ░██    ░██ ░██    ░██ ░██    ░██ ░█████████ ░██          ░██    ░██ ░██    ░██ 
-░██ ░██    ░██ ░██   ░███ ░██   ░███ ░██        ░██          ░██   ░███ ░██    ░██ 
-░██  ░███████   ░█████░██  ░█████░██  ░███████  ░██      ░██  ░█████░██  ░███████  
-                      ░██        ░██                                ░██            
-                ░███████   ░███████                           ░███████             
+https://patorjk.com/software/taag/#p=display&v=0&f=ANSI%20Shadow&t=logger
+
+
+██╗      ██████╗  ██████╗  ██████╗ ███████╗██████╗ 
+██║     ██╔═══██╗██╔════╝ ██╔════╝ ██╔════╝██╔══██╗
+██║     ██║   ██║██║  ███╗██║  ███╗█████╗  ██████╔╝
+██║     ██║   ██║██║   ██║██║   ██║██╔══╝  ██╔══██╗
+███████╗╚██████╔╝╚██████╔╝╚██████╔╝███████╗██║  ██║
+
+
 */
 var Log_Writer io.Writer = os.Stdout
 const (
@@ -1315,23 +1332,21 @@ func append_and_replace(dst *[]byte, src []byte, old byte, new ...byte) {
 }
 
 
-func is_dir(path string) bool {
-	return dir_exists(path)
-}
-func dir_exists(path string) bool {
-	info, err := os.Lstat(path)
-	if err != nil {
-		return false
-	}
-	return info.IsDir()
-}
+/* https://patorjk.com/software/taag/#p=display&v=0&f=ANSI%20Shadow&t=coreutils
 
 
-// no operation function used for explicitness
-func noop(_ ...string) {}
+ ██████╗ ██████╗ ██████╗ ███████╗██╗   ██╗████████╗██╗██╗     ███████╗
+██╔════╝██╔═══██╗██╔══██╗██╔════╝██║   ██║╚══██╔══╝██║██║     ██╔════╝
+██║     ██║   ██║██████╔╝█████╗  ██║   ██║   ██║   ██║██║     ███████╗
+██║     ██║   ██║██╔══██╗██╔══╝  ██║   ██║   ██║   ██║██║     ╚════██║
+╚██████╗╚██████╔╝██║  ██║███████╗╚██████╔╝   ██║   ██║███████╗███████║
+ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝ ╚═════╝    ╚═╝   ╚═╝╚══════╝╚══════╝
 
 
-func shell_command(working_directory string, environment []string, binary string, arguments ...string) error {
+*/
+
+
+func execute(working_directory string, environment []string, binary string, arguments ...string) error {
 	cmd := exec.Command(binary, arguments...)
 	if len(environment) > 0 {
 		cmd.Env = os.Environ()
@@ -1358,3 +1373,74 @@ func which(name string) (path string) {
 	assert(filepath.IsAbs(path))
 	return path
 }
+
+
+func file_contents_are_equal(a, b string) bool {
+	assert(filepath.IsAbs(a))
+	assert(filepath.IsAbs(b))
+	a_info, err := os.Lstat(a)
+	if err != nil {
+		return false
+	}
+	b_info, err := os.Lstat(b)
+	if err != nil {
+		return false
+	}
+	assert_location(!a_info.IsDir() && !b_info.IsDir(), "", 1)
+	if a_info.Size() != b_info.Size() {
+		return false
+	} else {
+		a_contents, err := os.ReadFile(a)
+		if err != nil {
+			return false
+		}
+		b_contents, err := os.ReadFile(b)
+		if err != nil {
+			return false
+		}
+		return slices.Equal(a_contents, b_contents)
+	}
+}
+
+
+func is_dir(path string) bool { return dir_exists(path) }
+func dir_exists(path string) bool {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
+}
+
+
+func file_exists(path string) bool {
+	info, err := os.Lstat(path)
+	return err == nil && info.IsDir()
+}
+
+
+// inspired by tar flag
+// returned string will never end in a slash so you can't be sure it's a directory
+func strip_leading_component(path string, n int) string {
+	if n < 0 {
+		n = 0
+	}
+	assert_location(filepath.IsAbs(path), "", 1)
+	path = filepath.Clean(path)
+	return strings.Join(strings.Split(path, string(filepath.Separator))[n:], string(filepath.Separator))
+}
+
+
+func filepath_relative_child(base, target string) string {
+	// filepath.Rel doesn't require target to be a child of base but for this script, that will never be the case.
+	assert(strings.HasPrefix(target, base))
+	assert(filepath.IsAbs(target))
+	assert(filepath.IsAbs(base))
+	rel, err := filepath.Rel(base, target)
+	assert_location(err == nil, "", 1)
+	return rel
+}
+
+
+// no operation function used for explicitness
+func noop(_ ...string) {}
