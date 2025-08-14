@@ -58,24 +58,26 @@ var (
 		}
 		return path
 	}()
-	BIG_BANG_ROOT         = filepath.Clean(os.Getenv("BIG_BANG_ROOT"))
+	BIG_BANG_GIT_ROOT    = filepath.Clean(os.Getenv("BIG_BANG_GIT_ROOT"))
+	BIG_BANG_ROOT        = filepath.Clean(os.Getenv("BIG_BANG_ROOT"))
+	BIG_BANG_SHARE       = filepath.Clean(os.Getenv("BIG_BANG_SHARE"))
+	BIG_BANG_MAN         = filepath.Clean(os.Getenv("BIG_BANG_MAN"))
+	BIG_BANG_BIN         = filepath.Clean(os.Getenv("BIG_BANG_BIN"))
+	BIG_BANG_TMP         = filepath.Clean(os.Getenv("BIG_BANG_TMP"))
+	CARGO_HOME           = filepath.Clean(os.Getenv("CARGO_HOME"))
+	RUSTUP_HOME          = filepath.Clean(os.Getenv("RUSTUP_HOME"))
+	HOMEBREW_BUNDLE_FILE = filepath.Clean(os.Getenv("HOMEBREW_BUNDLE_FILE"))
+
+
 	// A mirror of the home directory but only hosts dotfiles.
-	BIG_BANG_DOTFILES     = filepath.Clean(os.Getenv("BIG_BANG_DOTFILES"))
-	BIG_BANG_TMP          = filepath.Clean(os.Getenv("BIG_BANG_TMP"))
-	BIG_BANG_SHARE        = filepath.Clean(os.Getenv("BIG_BANG_SHARE"))
-	BIG_BANG_BIN          = filepath.Clean(os.Getenv("BIG_BANG_BIN"))
-	CARGO_HOME            = filepath.Clean(os.Getenv("CARGO_HOME"))
-	RUSTUP_HOME           = filepath.Clean(os.Getenv("RUSTUP_HOME"))
-	HOMEBREW_BUNDLE_FILE  = filepath.Clean(os.Getenv("HOMEBREW_BUNDLE_FILE"))
-
-
-	big_bang_dotfiles_common      = filepath.Join(BIG_BANG_DOTFILES, "common")
+	big_bang_dotfiles             = filepath.Clean(filepath.Join(BIG_BANG_GIT_ROOT, "dotfiles"))
+	big_bang_dotfiles_common      = filepath.Join(big_bang_dotfiles, "common")
 	big_bang_dotfiles_os_specific = func() string {
 		switch runtime.GOOS {
 		case "darwin":
-			return filepath.Join(BIG_BANG_DOTFILES, "macos")
+			return filepath.Join(big_bang_dotfiles, "macos")
 		case "linux":
-			return filepath.Join(BIG_BANG_DOTFILES, "debian")
+			return filepath.Join(big_bang_dotfiles, "debian")
 		default:
 			fmt.Println("unsupported os")
 			os.Exit(1)
@@ -128,10 +130,7 @@ func main() {
 					logger.Error(err).Msg("creating brewfile")
 					return
 				}
-				if err := execute("", nil, "brew", "bundle", "check", "--file", HOMEBREW_BUNDLE_FILE); err == nil {
-					return
-				}
-				if err := execute("", nil, "brew", "bundle", "install", "--file", HOMEBREW_BUNDLE_FILE); err == nil {
+				if err := execute("", nil, "brew", "bundle", "install", "--quiet", "--file", HOMEBREW_BUNDLE_FILE); err == nil {
 					return
 				}
 			},
@@ -160,20 +159,9 @@ func main() {
 				if !has_missing_dependency {
 					return
 				}
-				logger.Info().Begin("installing")
-				defer logger.Info().Done("installing")
-
-
-				assert(filepath.IsAbs(BIG_BANG_SHARE))
-				assert(filepath.IsAbs(CARGO_HOME))
-				assert(filepath.IsAbs(RUSTUP_HOME))
-				assert(strings.HasPrefix(filepath.Clean(CARGO_HOME),  BIG_BANG_SHARE))
-				assert(strings.HasPrefix(RUSTUP_HOME, BIG_BANG_SHARE))
-				assert(slices.Contains(
-						PATH, 
-						filepath.Clean(filepath.Join(CARGO_HOME, "bin"))))
-
-
+				logger.Info().Begin("installing cargo")
+				defer logger.Info().Done("installing cargo")
+				assert(slices.Contains(PATH,filepath.Clean(filepath.Join(CARGO_HOME, "bin"))))
 				if path := which("curl"); path == "" {
 					assert(filepath.IsAbs(path))
 					assert(filepath.IsAbs(BIG_BANG_ROOT))
@@ -194,22 +182,24 @@ func main() {
 			Name:    "fish",
 			Install: func(logger *Logger) {
 				if path := which("fish"); path != "" {
-					assert(filepath.IsAbs(path))
-					assert(filepath.IsAbs(BIG_BANG_ROOT))
 					if strings.HasPrefix(path, BIG_BANG_ROOT) {
 						version_check := exec.Command("fish", "--version")
-						expect        := "fish, version 4.0.2-gf1456f970"
-						actual, _     := version_check.Output()
-						if slices.Equal(actual, string_to_bytes(expect)) {
+						expect        := "fish, version 4.0.2"
+						actual_raw, _     := version_check.Output()
+						actual := strings.TrimSpace(string(actual_raw))
+						if actual == expect {
+							logger.Info().Msg("fish is already installed")
 							return
-						} else {
-                                                        // TODO: Info().Bytes()
-							logger.Info().Str("current_version", string(actual)).Str("target_version", expect).Msg("outdated installation")
-						}
+						} 
+						// TODO: Info().Bytes()
+						logger.Info().Str("current_version", actual).Str("target_version", expect).Msg("outdated installation")
+						defer func() {
+							assert(string(actual) == expect)
+						}()
 					}
 				}
-				logger.Info().Begin("installing")
-				defer logger.Info().Done("installing")
+				logger.Info().Begin("installing fish")
+				defer logger.Info().Done("installing fish")
 				if path := which("cargo"); path != "" {
 					assert(filepath.IsAbs(path))
 					assert(filepath.IsAbs(BIG_BANG_SHARE))
@@ -348,19 +338,22 @@ func main() {
 
 
 	var err_setup = func() error {
-		for _, dir := range []string{BIG_BANG_ROOT, BIG_BANG_DOTFILES, BIG_BANG_TMP, BIG_BANG_SHARE, BIG_BANG_BIN} {
+		for _, dir := range []string{BIG_BANG_ROOT, BIG_BANG_TMP, BIG_BANG_SHARE, BIG_BANG_BIN} {
 			assert(filepath.IsAbs(dir), "exported in $ZDOTDIR/.zprofile and sourced by big_bang.sh before calling this script")
 		}
 
 
-		assert(dir_exists(BIG_BANG_ROOT),                 "the repo is cloned into the hardcoded BIG_BANG_ROOT")
-		assert(dir_exists(BIG_BANG_DOTFILES),             "included in the big bang repo")
-		assert(dir_exists(BIG_BANG_SHARE),                "created by big_bang.sh hosting GOROOT and GOPATH")
-		assert(dir_exists(BIG_BANG_BIN),                  "created by big_bang.sh hosting go.exe")
+		assert(dir_exists(big_bang_dotfiles),             "included in the big bang repo")
 		assert(dir_exists(big_bang_dotfiles_common),      "included in the big bang repo")
 		assert(dir_exists(big_bang_dotfiles_os_specific), "included in the big bang repo")
+		assert(dir_exists(BIG_BANG_GIT_ROOT),             "the repo is cloned into $HOME/code/big_bang")
+		assert(dir_exists(BIG_BANG_ROOT),                 "hosts BIG_BANG_SHARE")
+		assert(dir_exists(BIG_BANG_SHARE),                "created by big_bang.sh hosting GOROOT and GOPATH")
+		assert(dir_exists(BIG_BANG_BIN),                  "created by big_bang.sh hosting go.exe")
 
 
+		os.MkdirAll(BIG_BANG_SHARE, 0755)
+		os.MkdirAll(BIG_BANG_MAN,   0755)
 		if err := os.RemoveAll(BIG_BANG_TMP); err != nil { 
 			return err 
 		}
@@ -373,12 +366,7 @@ func main() {
 		}
 		return nil
 	}()
-	should_cleanup_big_bang_tmp := true
-	defer func() {
-		if should_cleanup_big_bang_tmp {
-			os.RemoveAll(BIG_BANG_TMP)
-		}
-	}()
+	defer os.RemoveAll(BIG_BANG_TMP)
 	if err_setup != nil {
 		logger.Error(err_setup).Msg("initiliazing environment")
 		return
@@ -392,7 +380,7 @@ func main() {
 		}
 		commands := map[string]Info{
 			"dotfiles_check": Info{
-				description: "checks if actual dotfiles match those in BIG_BANG_DOTFILES",
+				description: "checks if actual dotfiles match those in big_bang/dotfiles",
 				action: func() {
 					files_set := mismatched_dotfiles(logger)
 					if len(files_set) == 0 {
@@ -407,7 +395,7 @@ func main() {
 				},
 			},
 			"dotfiles_sync": Info{
-				description: "Synchronizes dotfiles from $BIG_BANG_DOTFILES to $HOME by creating missing files or truncating existing files. It will never delete other files.",
+				description: "Synchronizes dotfiles from big_bang/dotfiles to $HOME by creating missing files or truncating existing files. It will never delete other files.",
 				action: func() {
 					files := mismatched_dotfiles(logger)
 					if len(files) == 0 {
@@ -419,13 +407,10 @@ func main() {
 					for relative_path := range files {
 						assert(!filepath.IsAbs(relative_path))
 						var err_sync = func() error {
-							var src = func() string {
-								if os_specific_file := filepath.Join(big_bang_dotfiles_os_specific, relative_path); file_exists(os_specific_file) {
-									return os_specific_file
-								} else {
-									return filepath.Join(big_bang_dotfiles_common, relative_path)
-								}
-							}()
+							src := filepath.Join(big_bang_dotfiles_os_specific, relative_path)
+							if !file_exists(src) {
+								src = filepath.Join(big_bang_dotfiles_common, relative_path)
+							}
 							assert(!is_dir(src))
 							contents, err := os.ReadFile(src)
 							if err != nil {
@@ -438,7 +423,7 @@ func main() {
 							if err := os.WriteFile(filepath.Join(HOME, relative_path), contents, 0644); err != nil {
 								return err
 							}
-							logger.Info().Str("file", strings.TrimPrefix(src, BIG_BANG_DOTFILES)).Msg("updated dotfile")
+							logger.Info().Str("file", strings.TrimPrefix(src, big_bang_dotfiles)).Msg("updated dotfile")
 							return nil
 						}()
 						if err_sync != nil {
@@ -449,9 +434,10 @@ func main() {
 				},
 			},
 			"dependencies_download": Info{
-				description: "dependencies of which the binary can be downloaded directly will be saved in BIG_BANG_TMP",
+				description: "dependencies of which the binary can be downloaded directly will be saved in BIG_BANG_ROOT/download",
 				action: func() {
-					should_cleanup_big_bang_tmp = false
+					total_ctx, total_cancel := context.WithTimeout(context.Background(), time.Minute * 15)
+					defer total_cancel()
 					var wg sync.WaitGroup
 					defer wg.Wait()
 					for _, artifact := range artifacts {
@@ -461,58 +447,44 @@ func main() {
 						wg.Add(1)
 						go func() {
 							defer wg.Done()
-							logger := logger.With_Str("dependency", artifact.Name)
-							logger.Info().Begin("downloading")
-							defer logger.Info().Done("downloading")
-							output_dir := filepath.Join(BIG_BANG_TMP, artifact.Name)
-							if err := os.MkdirAll(output_dir, 0755); err != nil {
-								logger.Error(err).Msg("creating output-dir")
-							}
-							if err := execute("", nil,
-								"curl", 
-								"--location", 
-								"--fail-with-body", 
-								"--remote-name", 
-								"--retry", "10", 
-								"--max-time", "300", 
-								"--output-dir", output_dir,
-								"--silent",
-								artifact.Download_Link,
-							); err != nil {
-								logger.Error(err).Str("dependency", artifact.Name).Msg("failed to download dependency")
-								return
-							}
+							individual_ctx, individual_cancel := context.WithTimeout(total_ctx, time.Minute * 3)
+							defer individual_cancel()
+							download_artifact(individual_ctx, artifact, filepath.Join(BIG_BANG_ROOT, "download"), logger)
 						}()
-				 	}
+					}
 				},
 			},
 			"dependencies_install":  Info{
 				description: "WIP",
 				action: func() {
-					total_download_time := time.Minute * 10
-					ctx, cancel := context.WithTimeout(context.Background(), total_download_time)
-					defer cancel()
+					total_ctx, total_cancel := context.WithTimeout(context.Background(), time.Minute * 15)
+					defer total_cancel()
 					var wg sync.WaitGroup
+					defer wg.Wait()
 					for _, artifact := range artifacts {
-						if path := which(artifact.Name); path != "" || !artifact.System_Wide && strings.HasPrefix(path, BIG_BANG_ROOT) {
+						if artifact.Install != nil {
+							artifact.Install(logger.With_Str("artifact", artifact.Name))
+							continue
+						} 
+						assert(artifact.Download_Link != "", 
+							"artifacts without a custom install step means their binaries are downloaded directly",
+						)
+						if path := which(artifact.Name); strings.HasPrefix(path, BIG_BANG_ROOT) {
+							logger.Info().Str("artifact", artifact.Name).Msg("already installed")
 							continue
 						}
 						wg.Add(1)
 						go func() {
 							defer wg.Done()
-							logger_with_artifact_name := logger.With_Str("artifact", artifact.Name)
-							if artifact.Install != nil {
-								artifact.Install(logger_with_artifact_name)
-							} else {
-								artifact_handle := download_artifact(ctx, artifact, logger_with_artifact_name)
-								if artifact_handle == nil {
-									return
-								}
-								install_artifact(artifact, artifact_handle, logger_with_artifact_name)
+							individual_ctx, individual_cancel := context.WithTimeout(total_ctx, time.Minute * 3)
+							defer individual_cancel()
+							download_path := download_artifact(individual_ctx, artifact, BIG_BANG_TMP, logger)
+							if download_path == "" {
+								return
 							}
+							install_artifact(artifact, download_path, logger)
 						}()
 					}
-					wg.Wait()
 				},
 			},
 		}
@@ -548,7 +520,7 @@ func main() {
 }
 
 
-// The returned file paths are relative to BIG_BANG_DOTFILES. Note that BIG_BANG_DOTFILES/<SUBDIR> is a mirror of the home directory.
+// The returned file paths are relative to big_bang_dotfiles. Note that big_bang/dotfiles/<SUBDIR> is a mirror of the home directory.
 func mismatched_dotfiles(logger *Logger) (mismatched_files map[string]struct{}) {
 	defer func() {
 		if len(mismatched_files) > 0 {
@@ -557,8 +529,8 @@ func mismatched_dotfiles(logger *Logger) (mismatched_files map[string]struct{}) 
 			}
 		}
 	}()
-	assert(filepath.IsAbs(BIG_BANG_DOTFILES))
-	assert(dir_exists(BIG_BANG_DOTFILES))
+	assert(filepath.IsAbs(big_bang_dotfiles))
+	assert(dir_exists(big_bang_dotfiles))
 	logger.Info().Begin("finding mismatches")
 	defer logger.Info().Done("finding mismatches")
 
@@ -630,132 +602,109 @@ func mismatched_dotfiles(logger *Logger) (mismatched_files map[string]struct{}) 
 }
 
 
-// Caller must provide a context.WithTimeout() because this will retry indefinitely.
-// If artifact downloads successfully, caller is responsible for closing the file handle. 
-// There's only one case where handle == nil and path != "", and thats when resetting the handle cursor positiion. The caller can instead try to open the file
-// again.
-func download_artifact(ctx context.Context, artifact Artifact, logger *Logger) (artifact_handle *os.File) {
-	waiting_time := time.Minute * 5
-	retry_event  := logger.Warn()
-	var ok bool
-	defer func() {
-		if ok {
-			logger.Info().Done("downloading")
-		} else {
-			if artifact_handle != nil {
-				artifact_handle.Close()
-				artifact_handle = nil
-			}
-		}
-	}()
-	ok = func() bool {
-		first_iteration := true
-		for retry_delay_ns := time.Second * 2;; retry_delay_ns *= 2 { 
-			if first_iteration {
-				select {
-				case <- ctx.Done(): return false
+// You must provide a context.WithTimeout() to set a hard limit on each transfer, which will be reset with every retry. 
+// The retries use an exponential backoff strategy, capped at 10 minutes. The provided ctx should have a parent context.WithTimeout() to establish a total 
+// timeout, as this function will retry indefinitely.
+//
+// If the artifact download fails, the function will return an empty string.
+func download_artifact(ctx context.Context, artifact Artifact, output_directory string, logger *Logger) (download_path string) {
+	assert(filepath.IsAbs(output_directory))
+	logger = logger.With_Str("artifact", artifact.Name)
+	logger.Info().Begin("downloading")
+	defer logger.Info().Done("downloading")
+	if err := os.MkdirAll(output_directory, 0755); err != nil {
+		return ""
+	}
+	retry_event := logger.Warn()
+	first_iteration := true
+	for retry_delay_ns := time.Second * 2;; retry_delay_ns = min(retry_delay_ns * 2, time.Minute * 10) { 
+		if first_iteration {
+			select {
+				case <- ctx.Done(): return ""
 				default: first_iteration = false
-				}
-			} else {
-				retry_event.Number("retry_delay(s)", int64(retry_delay_ns / time.Second)).Msg("Retry artifact download")
-				retry_event = logger.Warn()
-				select {
-				case <- ctx.Done(): return false
+			}
+		} else {
+			retry_event.Number("retry_delay(s)", int64(retry_delay_ns / time.Second)).Msg("Retry artifact download")
+			retry_event = logger.Warn()
+			select {
+				case <- ctx.Done(): return ""
 				case <- time.After(retry_delay_ns): 
-					if artifact_handle != nil {
-						   err1 := artifact_handle.Truncate(0);           
-						_, err2 := artifact_handle.Seek(0, io.SeekStart); 
-						if err1 != nil || err2 != nil{ 
-							logger.Error(err1, err2).Msg("truncating temporary file for retrying download")
-							return false 
-						}
-					}
-				}
 			}
-			attempt_ctx, attempt_cancel := context.WithTimeout(ctx, waiting_time)
-			// TODO: should all of this be one closure? Right now, it'd just pile up goroutines whiie retrying indefinitely
-			defer attempt_cancel()
-			request,  err := http.NewRequestWithContext(attempt_ctx, http.MethodGet, artifact.Download_Link, nil)
-			if err != nil { 
-				logger.Error(err).Msg("initializing http request")
-				return false
-			}
-			logger.Info().Begin("downloading")
-			response, err := http.DefaultClient.Do(request)
-			if err != nil { 
-				retry_event.Err(err)
-				continue
-			}
-			defer response.Body.Close()
-			if response.StatusCode != http.StatusOK {
-				retry_event.Int("status_code", response.StatusCode)
-				continue
-			}
-			if artifact_handle == nil {
-				filename := func(content_disposition string) string {
-					content_disposition_parts := strings.Split(content_disposition, ";")
-					if len(content_disposition_parts) < 2 || content_disposition_parts[0] != "attachment"  {
-						return ""
-					}
-					// TODO: support `filename*=UTF-8`
-					// https://datatracker.ietf.org/doc/html/rfc5987#section-3.2
-					// https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Disposition
-					filename_key_val := strings.Split(content_disposition_parts[1], "=")
-					if len(filename_key_val) != 2 || strings.TrimSpace(filename_key_val[0]) != "filename" {
-						return ""
-					}
-					return strings.Trim(filename_key_val[1], `" `)
-				}(response.Header.Get("Content-Disposition"))
-				if filename == "" {
-					retry_event.Err(errors.New("invalid Content-Disposition header"))
-					continue
-				}
-				download_path := filepath.Join(BIG_BANG_TMP, filepath.Clean(filename))
-				var err_artifact_file error
-				artifact_handle, err_artifact_file = os.Create(download_path)
-				if err_artifact_file != nil {
-					logger.Error(err).Str("file", download_path).Msg("creating file to write downloaded artifact to")
-					return false
-				}
-			}
-			io.Copy(artifact_handle, response.Body)
-			artifact_handle.Sync()
-			actual_checksum := hex.EncodeToString(file_checksum(artifact_handle, logger))
-			if artifact.Checksum != "" {
-				if actual_checksum != artifact.Checksum {
-					retry_event.
-						Str("expected", artifact.Checksum).
-						Str("actual", actual_checksum).
-						Err(errors.New("checksum mismatch"))
-					continue
-				}
-			} else {
-				logger.Error().Str("checksum", actual_checksum).Msg("unset checksum. copy the calculated checksum and set it in the source code")
-				return false
-			}
-			break
 		}
-		return true
-	}()
-	return artifact_handle
+		request,  err := http.NewRequestWithContext(ctx, http.MethodGet, artifact.Download_Link, nil)
+		if err != nil { 
+			logger.Error(err).Msg("initializing http request")
+			return ""
+		}
+		response, err := http.DefaultClient.Do(request)
+		if err != nil { 
+			retry_event.Err(err)
+			continue
+		}
+		defer response.Body.Close()
+		if response.StatusCode != http.StatusOK {
+			retry_event.Int("status_code", response.StatusCode)
+			continue
+		}
+		filename := func() string {
+			content_disposition := response.Header.Get("Content-Disposition")
+			content_disposition_parts := strings.Split(content_disposition, ";")
+			if len(content_disposition_parts) < 2 || content_disposition_parts[0] != "attachment"  {
+				return ""
+			}
+			// TODO: support `filename*=UTF-8`
+			// https://datatracker.ietf.org/doc/html/rfc5987#section-3.2
+			// https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Disposition
+			filename_key_val := strings.Split(content_disposition_parts[1], "=")
+			if len(filename_key_val) != 2 || strings.TrimSpace(filename_key_val[0]) != "filename" {
+				return ""
+			}
+			return strings.Trim(filename_key_val[1], `" `)
+		}()
+		if filename == "" {
+			retry_event.Err(errors.New("invalid Content-Disposition header"))
+			continue
+		}
+		download_path = filepath.Clean(filepath.Join(output_directory, filename))
+		response_body, err := io.ReadAll(response.Body)
+		if err != nil {
+			retry_event.Err(err)
+			continue
+		}
+		if err := os.WriteFile(download_path, response_body, 0644); err != nil {
+			retry_event.Err(err)
+			continue
+		}
+		actual_checksum := hex.EncodeToString(file_checksum(download_path, logger))
+		if artifact.Checksum != "" {
+			if actual_checksum != artifact.Checksum {
+				retry_event.
+					Str("expected", artifact.Checksum).
+					Str("actual", actual_checksum).
+					Err(errors.New("checksum mismatch"))
+				continue
+			}
+		} else {
+			logger.Error().Str("checksum", actual_checksum).
+				Msg("unset checksum. copy the calculated checksum and set it in the source code then rerun the script")
+			return ""
+		}	
+		break
+	}
+	assert(filepath.IsAbs(download_path))
+	return download_path
 }
 
 
-func install_artifact(artifact Artifact, artifact_handle *os.File, logger *Logger) (ok bool) {
-	defer func() {
-		if ok {
-			logger.Info().Done("installing")
-		}
-		artifact_handle.Close()
-	}()
-	_    = artifact_handle.Sync()
-	_, _ = artifact_handle.Seek(0, io.SeekStart)
-
-
-	artifact_tmp_dir  := filepath.Join(BIG_BANG_TMP, artifact.Name)
-	os.Mkdir(artifact_tmp_dir, 0755)
-	artifact_fullpath := artifact_handle.Name()
-	artifact_filename := filepath.Base(artifact_fullpath)
+func install_artifact(artifact Artifact, artifact_archive_path string, logger *Logger) (ok bool) {
+	assert(artifact.Name != "")
+	assert(filepath.IsAbs(artifact_archive_path))
+	assert(strings.HasPrefix(artifact_archive_path, BIG_BANG_TMP))
+	assert(file_exists(artifact_archive_path))
+	logger = logger.With_Str("artifact", artifact.Name)
+	logger.Info().Begin("installing")
+	defer logger.Info().Done("installing")
+	artifact_filename := filepath.Base(artifact_archive_path)
 	switch {
 	default: 
 		logger.Error().Str("file", artifact_filename).Msg("unsupported extension")
@@ -769,23 +718,26 @@ func install_artifact(artifact Artifact, artifact_handle *os.File, logger *Logge
 			logger.Error().Str("file", artifact_filename).Msg("unsupported tar compresison")
 			return false
 		}
-		tar_xz := exec.Command(
+		if err := execute("", nil,
 			"tar", 
 			"--extract",   compression_flag,
-			"--file",      artifact_fullpath,
-			"--directory", artifact_tmp_dir,
-		)
-		if out, err := tar_xz.CombinedOutput(); err != nil {
-			logger.Error(errors.New(string(out))).Msg("unpacking .xz file with external tool")
+			"--file",      artifact_archive_path,
+			"--directory", filepath.Dir(artifact_archive_path),
+		); err != nil {
+			logger.Error(err).Msg("unpacking .xz file with external tool")
 			return false
 		}
 	case strings.HasSuffix(artifact_filename, ".zip"):
 		var unpacking_error = func() error {
-			info, err := artifact_handle.Stat(); 
+			artifact_archive_handle, err := os.Open(artifact_archive_path)
+			if err != nil {
+				return err
+			}
+			info, err := artifact_archive_handle.Stat()
 			if err != nil { 
 				return err 
 			}
-			zip_reader, err := zip.NewReader(artifact_handle, info.Size())
+			zip_reader, err := zip.NewReader(artifact_archive_handle, info.Size())
 			if err != nil { 
 				return err 
 			}
@@ -793,7 +745,7 @@ func install_artifact(artifact Artifact, artifact_handle *os.File, logger *Logge
 				if strings.Contains(entry.Name, "__MACOSX") {
 					continue
 				}
-				extraction_path := filepath.Join(artifact_tmp_dir, filepath.Clean(entry.Name))
+				extraction_path := filepath.Join(filepath.Dir(artifact_archive_path), filepath.Clean(entry.Name))
 				if entry.FileInfo().IsDir() || filepath.Ext(entry.Name) == ".app" { 
 					if err := os.MkdirAll(extraction_path, 0755); err != nil { return err }
 					continue 
@@ -819,52 +771,66 @@ func install_artifact(artifact Artifact, artifact_handle *os.File, logger *Logge
 			logger.Error(unpacking_error).Msg("unpacking zip file")
 		}
 	}
-	var find_binary func(string) string
-	find_binary = func(directory string) string {
-		entries, err := os.ReadDir(directory)
-		if err != nil {
+
+
+	var find_file func(string, string) string
+	find_file = func(to_find, directory string) (found string) {
+		assert(!filepath.IsAbs(to_find))
+		assert(is_dir(directory))
+		defer func() {
+			if found != "" {
+				assert(filepath.IsAbs(found))
+				assert(!is_dir(found))
+			}
+		}()
+		if entries, err := os.ReadDir(directory); err == nil {
+			var directories []string
+			for _, entry := range entries {
+				entry_path := filepath.Join(directory, entry.Name())
+				if entry.IsDir() {
+					directories = append(directories, entry_path)
+					continue
+				}
+				if filepath.Base(entry_path) == to_find {
+					return entry_path
+				}
+			}
+			for _, child_dir := range directories {
+				assert(is_dir(child_dir))
+				found = find_file(to_find, child_dir)
+				if found != "" {
+					return found
+				}
+			}
+		} else {
 			logger.Error(err).Str("directory", directory).Msg("finding binary")
 			return ""
-		}
-		var directories []string
-		for _, entry := range entries {
-			if entry.IsDir() {
-				directories = append(directories, entry.Name())
-				continue
-			}
-			binary_path := entry.Name()
-			if filepath.Base(binary_path) == artifact.Name {
-				return filepath.Join(directory, binary_path)
-			}
-		}
-		for _, child_dir := range directories {
-			binary_path := find_binary(filepath.Join(directory, child_dir))
-			if binary_path != "" {
-				return binary_path
-			}
 		}
 		return ""
 	}
 	artifact_binary_destination := filepath.Join(BIG_BANG_BIN, artifact.Name)
-	os.RemoveAll(artifact_binary_destination)
+	if err := os.Remove(artifact_binary_destination); err != nil  && !errors.Is(err, fs.ErrNotExist) {
+		logger.Error(err).Msg("making sure binary destination file doesn't exist yet")
+		return false
+	}
 	if artifact.Retain_Installation_Dir {
 		artifact_root_dir := filepath.Join(BIG_BANG_SHARE, artifact.Name)
 		os.RemoveAll(artifact_root_dir)
-		if err := os.Rename(artifact_tmp_dir, artifact_root_dir); err != nil {
+		if err := os.Rename(filepath.Dir(artifact_archive_path), artifact_root_dir); err != nil {
 			logger.Error(err).Msg("finalizing artifact installation")
 			return false
 		}
-		artifact_binary_source := find_binary(artifact_root_dir)
-		if artifact_binary_source == "" {
-			logger.Error().Msg("binary was not found")
+		artifact_binary_source := find_file(artifact.Name, artifact_root_dir)
+		if !slices.Contains(PATH, artifact_binary_source) {
+			logger.Error().Str("path_to_add", filepath.Dir(artifact_binary_source)).Msg("artifact bin directory has not been added to PATH")
 			return false
 		}
-		if err := os.Symlink(artifact_binary_source, artifact_binary_destination); err != nil {
-			logger.Error(err).Msg("symlinking artifact binary")
+		if err := os.Chmod(artifact_binary_source, 0755); err != nil {
+			logger.Error(err).Msg("making artifact binary executable")
 			return false
 		}
 	} else {
-		artifact_binary_source := find_binary(artifact_tmp_dir)
+		artifact_binary_source := find_file(artifact.Name, filepath.Dir(artifact_archive_path))
 		if artifact_binary_source == "" {
 			logger.Error().Msg("binary was not found")
 			return false
@@ -873,35 +839,26 @@ func install_artifact(artifact Artifact, artifact_handle *os.File, logger *Logge
 			logger.Error(err).Str("artifact_binary_source", artifact_binary_source).Msg("moving binary to BIG_BANG_BIN")
 			return false
 		}
-	}
-	if err := os.Chmod(artifact_binary_destination, 0755); err != nil {
-		logger.Error(err).Msg("making artifact binary executable")
-		return false
+		if err := os.Chmod(artifact_binary_destination, 0755); err != nil {
+			logger.Error(err).Msg("making artifact binary executable")
+			return false
+		}
 	}
 	return true
 }
 
 
-func file_checksum(source *os.File, logger *Logger) []byte {
-	debug := logger.Debug().Str("file", source.Name())
-	if err := source.Sync(); err != nil { 
-		debug.Err(err).Msg("flushing file")
+func file_checksum(source_path string, logger *Logger) []byte {
+	assert(filepath.IsAbs(source_path))
+	source_handle, err := os.Open(source_path)
+	if err != nil {
 		return nil
 	}
-	original_position, err := source.Seek(0, io.SeekCurrent)
-	if err != nil { 
-		debug.Err(err).Msg("saving initial offset")
-		return nil
-	}
-	defer func() {
-		if _, err := source.Seek(original_position, io.SeekStart); err != nil { 
-			debug.Err(err).Msg("restoring offset")
-			return
-		}
-	}()
 	hasher := sha256.New()
-	if _, err := source.Seek(0, io.SeekStart); err != nil { debug.Err(err).Msg("resetting offset"); return nil }
-	if _, err := io.Copy(hasher, source);      err != nil { debug.Err(err).Msg("hashing file");     return nil }
+	if _, err := io.Copy(hasher, source_handle); err != nil { 
+		logger.Debug().Err(err).Msg("hashing file")
+		return nil 
+	}
 	return hasher.Sum(nil)
 }
 
@@ -923,7 +880,9 @@ type Artifact struct {
 	// Useful for self-contained executables with no other files unlike Golang with its stdlib or nvim with its runtime directories.
 	// Instead of symlinking the executable to BIG_BANG_BIN, it gets moved there instead.
 	Retain_Installation_Dir bool
+	// By default, Artifact binary paths must have BIG_BANG_ROOT as a prefix. This is not the case for system-wide dependencies.
 	System_Wide             bool
+	// As much as possible, download artifact binaries directly. If not possible, then specify the custom installation procedure here.
 	Install	func(*Logger)
 }
 
@@ -976,6 +935,7 @@ https://patorjk.com/software/taag/#p=display&v=0&f=ANSI%20Shadow&t=logger
 
 
 */
+// TODO: use a multiwriter and always write the logs to a file
 var Log_Writer io.Writer = os.Stdout
 const (
 	// These defaults cover most cases. Note that these buffers can still grow when the need arises, in which case, they don't get returned to the
@@ -1415,7 +1375,7 @@ func dir_exists(path string) bool {
 
 func file_exists(path string) bool {
 	info, err := os.Lstat(path)
-	return err == nil && info.IsDir()
+	return err == nil && !info.IsDir()
 }
 
 

@@ -45,10 +45,12 @@ env_setup() {
         Darwin)
                 tmp_zshenv="$(mktemp)"
                 cat > "$tmp_zshenv" <<'EOF'
-export BIG_BANG_ROOT="$HOME/code/big-bang/"
+export BIG_BANG_GIT_ROOT="$HOME/code/big_bang"
+# A good reason not to use .local/share is to keep the PATH variable short. I want to avoid symlinks and hardcode all variables. A possible alternative is
+# $HOME/big_bang, but that's a decision for later.
+export BIG_BANG_ROOT="$HOME/.local/share/big_bang"
 export BIG_BANG_SHARE="$BIG_BANG_ROOT/share"
 export BIG_BANG_BIN="$BIG_BANG_ROOT/bin"
-export BIG_BANG_DOTFILES="$BIG_BANG_ROOT/dotfiles"
 export BIG_BANG_MAN="$BIG_BANG_ROOT/man"
 export BIG_BANG_TMP="$BIG_BANG_ROOT/tmp"
 
@@ -81,7 +83,7 @@ fi
 # Place path exports in .zprofile - https://stackoverflow.com/a/34244862
 # Zsh on Arch [and OSX] sources /etc/profile – which overwrites and exports PATH – after having sourced $HOME/.zshenv
 export PATH="$BIG_BANG_SHARE/go/bin:$PATH"
-export PATH="$BIG_BANG_SHARE/nvim/bin:$PATH"
+export PATH="$BIG_BANG_SHARE/nvim/nvim-macos-arm64/bin:$PATH"
 export PATH="$CARGO_HOME/bin:$PATH"
 # Put BIG_BANG_BIN last for it to take priority.
 export PATH="$BIG_BANG_BIN:$PATH"
@@ -89,16 +91,16 @@ export PATH="$BIG_BANG_BIN:$PATH"
 export MANPATH="$BIG_BANG_MAN:$MANPATH"
 
 if command -v fish >/dev/null; then
-        exec fish
+        fish
 fi
 EOF
                 if ! cmp -z --quiet "$HOME/.zshenv" "$tmp_zshenv"; then
                         println "updating .zshenv"
-                        mv "$tmp_zshenv" "$HOME/.zshenv"
+                        cat "$tmp_zshenv" > "$HOME/.zshenv"
                 fi
                 if ! cmp -z --quiet "$HOME/.zprofile" "$tmp_zprofile"; then
                         println "updating .zprofile"
-                        mv "$tmp_zprofile" "$HOME/.zprofile"
+                        cat "$tmp_zprofile" > "$HOME/.zprofile"
                 fi
                 if ! . "$HOME/.zshenv"; then
                         println 'failed to source .zshenv'
@@ -118,7 +120,10 @@ EOF
                 ;;
         esac
 
-        test  -d "$BIG_BANG_ROOT"     || { println "you must clone the repository into $BIG_BANG_ROOT"; exit 1; }
+        if test "$(pwd)" != "$BIG_BANG_GIT_ROOT"; then
+                println "you probably did not clone the repo into $BIG_BANG_GIT_ROOT"
+                exit 1
+        fi
         test  -d "$BIG_BANG_DOTFILES" || { println "$BIG_BANG_DOTFILES should've been included when you cloned the repository"; exit 1; }
         mkdir -p "$BIG_BANG_BIN"           &&
                 mkdir -p "$BIG_BANG_SHARE" &&
@@ -186,47 +191,41 @@ install_golang() {
         fi
 
         case "$(command -v go)" in 
-        *$BIG_BANG_ROOT*)
+        $BIG_BANG_ROOT*)
                 go_version_actual_output="$(go version 2>/dev/null)"
                 if test "$go_version_actual_output" = "$go_version_expected_output"; then
                         println "golang v$go_version already installed"
                         return 0
                 fi
                 ;;
-        *)
-                println "downloading go"
-                download_location="$BIG_BANG_TMP/$go_release"
-		download_url="https://go.dev/dl/$go_release"
-                if ! curl --fail --show-error --silent --location --output "$download_location" -- "$download_url"; then
-                        println "failed to download go binary: $download_url"
-                        return 1
-                fi
-                if ! sha256 --quiet --check="$go_release_checksum" -- "$download_location"; then
-                        println "checksum mismatch for $go_release"
-                        return 1
-                fi
-                if ! tar --extract --gzip --file="$download_location" --directory="$BIG_BANG_SHARE"; then
-                        println "failed to extract $go_release"
-                        return 1
-                fi
-
-                if test "$(go version)" != "$go_version_expected_output"; then
-                        println "go version produced unexpected result. got: $(go version). expected: $go_version_expected_output"
-                        return 1
-                fi
-
-                go env -w GOPATH="$BIG_BANG_ROOT/go-path"
-                ;;
         esac
+        println "downloading go"
+        download_location="$BIG_BANG_TMP/$go_release"
+        download_url="https://go.dev/dl/$go_release"
+        if ! curl --fail --show-error --location --retry 10 --output "$download_location" -- "$download_url"; then
+                println "failed to download go binary: $download_url"
+                return 1
+        fi
+        if ! sha256 --quiet --check="$go_release_checksum" -- "$download_location"; then
+                println "checksum mismatch for $go_release"
+                return 1
+        fi
+        if ! tar --extract --gzip --file="$download_location" --directory="$BIG_BANG_SHARE"; then
+                println "failed to extract $go_release"
+                return 1
+        fi
+
+        if test "$(go version)" != "$go_version_expected_output"; then
+                println "go version produced unexpected result. got: $(go version). expected: $go_version_expected_output"
+                return 1
+        fi
+
+        go env -w GOPATH="$BIG_BANG_ROOT/go-path"
         return 0
 }
 
 
 main() {
-        if test "$(pwd)" != "$HOME/code/big-bang"; then
-                println 'you probably did not clone the repo into $HOME/code/big-bang'
-                exit 1
-        fi
         env_setup            || { println "error during env setup";  exit 1; }
         install_golang       || { println "error installing go";     exit 1; }
         setup_ssh            || { println "error during ssh setup";  exit 1; }
