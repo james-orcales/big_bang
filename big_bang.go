@@ -940,17 +940,18 @@ var Log_Writer io.Writer = os.Stdout
 const (
 	// These defaults cover most cases. Note that these buffers can still grow when the need arises, in which case, they don't get returned to the
 	// pool but are instead left for the garbage collector.
-	Log_Default_Buffer_Capacity = 
-		Log_Time_Capacity    + len(" ") +
-		Log_Level_Capacity   + len(" ") +
-		Log_Message_Capacity + len(" ") +
-		Log_Context_Capacity + len("\n")
-	Log_Time_Capacity    = len(time.RFC3339) - len("07:30") // it will always be in UTC
-	Log_Level_Capacity   = len("ERROR")
+	Log_Default_Buffer_Capacity = Log_Header_Capacity + Log_Context_Capacity + len("\n")
+	Log_Header_Capacity = 
+		Log_Time_Capacity    + len("|") +
+		Log_Level_Capacity   + len("|") +
+		Log_Message_Capacity + len("|")
+	Log_Time_Capacity    = len(time.RFC3339) - len("07:00") // hardcoded to always be in UTC
+	Log_Level_Capacity   = Log_Level_Word_Max_Length
 	Log_Message_Capacity = 100
 	Log_Context_Capacity = 400
 
 
+	Log_Level_Word_Max_Length = 5
 	Log_Level_Debug    = -10
 	Log_Level_Info     =   0
 	Log_Level_Warn     =  10
@@ -974,9 +975,9 @@ func New_Logger(level int) *Logger {
 
 
 // TODO: func (logger *Logger) Assert(cond bool) *Log Event { ... }
-func (logger *Logger) Debug() *Log_Event { if logger == nil || logger.Level > Log_Level_Debug { return nil } else { return init_log_event(logger, "DEBUG ") } }
-func (logger *Logger) Info()  *Log_Event { if logger == nil || logger.Level > Log_Level_Info  { return nil } else { return init_log_event(logger, "INFO  ") } }
-func (logger *Logger) Warn()  *Log_Event { if logger == nil || logger.Level > Log_Level_Warn  { return nil } else { return init_log_event(logger, "WARN  ") } }
+func (logger *Logger) Debug() *Log_Event { if logger == nil || logger.Level > Log_Level_Debug { return nil } else { return init_log_event(logger, "DEBUG"+string(Log_Component_Separator)) } }
+func (logger *Logger) Info()  *Log_Event { if logger == nil || logger.Level > Log_Level_Info  { return nil } else { return init_log_event(logger, "INFO "+string(Log_Component_Separator)) } }
+func (logger *Logger) Warn()  *Log_Event { if logger == nil || logger.Level > Log_Level_Warn  { return nil } else { return init_log_event(logger, "WARN "+string(Log_Component_Separator)) } }
 // The errs parameter is merely for convenience.
 func (logger *Logger) Error(errs ...error) *Log_Event { 
 	if logger == nil || logger.Level > Log_Level_Error { return nil } 
@@ -990,8 +991,8 @@ func (logger *Logger) Error(errs ...error) *Log_Event {
 }
 
 
-func (logger *Logger) With_Str (key string, val string) *Logger { if logger == nil { return nil }; return logger.With_Data_Quoted(key, val         ) }
-func (logger *Logger) With_Err (key string, val error ) *Logger { if logger == nil { return nil }; return logger.With_Data_Quoted(key, val.Error() ) }
+func (logger *Logger) With_Str (key string, val string) *Logger { if logger == nil { return nil }; return logger.With_Data(key, val         ) }
+func (logger *Logger) With_Err (key string, val error ) *Logger { if logger == nil { return nil }; return logger.With_Data(key, val.Error() ) }
 func (logger *Logger) With_Int (key string, val int   ) *Logger { if logger == nil { return nil }; return logger.With_Data(key, strconv.Itoa(val)  ) }
 func (logger *Logger) With_Bool(key string, cond bool ) *Logger { 
 	if logger == nil { 
@@ -1009,30 +1010,22 @@ func (logger *Logger) With_Data(key string, val string) *Logger {
 	} 
 	dst := New_Logger(logger.Level)
 	copy(dst.Buffer, logger.Buffer)
-	var space, underscore byte = ' ', '_'
-	append_and_replace(&logger.Buffer, string_to_bytes(key), space, underscore)
+	append_and_escape(&dst.Buffer, key)
 	dst.Buffer = append(dst.Buffer, '=')
-	dst.Buffer = append(dst.Buffer, string_to_bytes(val)...)
-	dst.Buffer = append(dst.Buffer, ' ')
-	return dst
-}
-func (logger *Logger) With_Data_Quoted(key string, val string) *Logger { 
-	if logger == nil { 
-		return nil 
-	} 
-	dst := New_Logger(logger.Level)
-	copy(dst.Buffer, logger.Buffer)
-	var space, underscore byte = ' ', '_'
-	append_and_replace(&dst.Buffer, string_to_bytes(key), space, underscore)
-	dst.Buffer = append(dst.Buffer, '=', '"')
-	append_and_replace(&dst.Buffer, string_to_bytes(val), '"', '\\', '"') 
-	dst.Buffer = append(dst.Buffer, '"', ' ')
+	append_and_escape(&dst.Buffer, val)
+	dst.Buffer = append(dst.Buffer, Log_Component_Separator)
 	return dst
 }
 
 
+func (event *Log_Event) Msg(message string) { 
+	if event == nil { 
+		return 
+	}
+	event.Message(message).Send() 
+}
 // func (event *Log_Event) Bytes (key string, val string) *Log_Event { if event == nil { return nil }; return event.Data_Quoted(key, val) }
-func (event *Log_Event) Str (key string, val string) *Log_Event { if event == nil { return nil }; return event.Data_Quoted(key, val) }
+func (event *Log_Event) Str (key string, val string) *Log_Event { if event == nil { return nil }; return event.Data(key, val) }
 func (event *Log_Event) Err (err error ) *Log_Event { 
 	if event == nil { 
 		return nil 
@@ -1041,8 +1034,9 @@ func (event *Log_Event) Err (err error ) *Log_Event {
 	if err != nil { 
 		err_str = err.Error() 
 	} 
-	return event.Data_Quoted("error", err_str) 
+	return event.Data("error", err_str) 
 }
+// TODO: Do a list here
 func (event *Log_Event) Errs(vals ...error) *Log_Event { 
 	if event == nil || len(vals) == 0  { return nil }
 	first_error := true
@@ -1056,10 +1050,10 @@ func (event *Log_Event) Errs(vals ...error) *Log_Event {
 		}
 		first_error = false
 		event.Buffer = append(event.Buffer, ' ', '"')
-		append_and_replace(&event.Buffer, string_to_bytes(v.Error()), '"', '\\', '"')
+		append_and_escape(&event.Buffer, v.Error())
 		event.Buffer = append(event.Buffer, '"', ' ')
 	}
-	event.Buffer = append(event.Buffer, ' ', ']', ' ')
+	event.Buffer = append(event.Buffer, ' ', ']', Log_Component_Separator)
 	return event
 }
 
@@ -1077,22 +1071,20 @@ func (event *Log_Event) Uint64(key string, val uint64 ) *Log_Event {
 	if event == nil { 
 		return nil 
 	}
-	var space, underscore byte = ' ', '_'
-	append_and_replace(&event.Buffer, string_to_bytes(key), space, underscore)
+	append_and_escape(&event.Buffer, key)
 	event.Buffer = append(event.Buffer, '=')
 	event.Buffer = strconv.AppendUint(event.Buffer, val, 10)
-	event.Buffer = append(event.Buffer, ' ')
+	event.Buffer = append(event.Buffer, Log_Component_Separator)
 	return event
 }
 func (event *Log_Event) Number(key string, val int64 ) *Log_Event { 
 	if event == nil { 
 		return nil 
 	}
-	var space, underscore byte = ' ', '_'
-	append_and_replace(&event.Buffer, string_to_bytes(key), space, underscore)
+	append_and_escape(&event.Buffer, key)
 	event.Buffer = append(event.Buffer, '=')
 	event.Buffer = strconv.AppendInt(event.Buffer, val, 10)
-	event.Buffer = append(event.Buffer, ' ')
+	event.Buffer = append(event.Buffer, Log_Component_Separator)
 	return event
 }
 func (event *Log_Event) Bool(key string, cond bool) *Log_Event { 
@@ -1109,36 +1101,23 @@ func (event *Log_Event) List(key string, vals ...string) *Log_Event {
 	if event == nil {
 		return nil
 	}
-	var space, underscore byte = ' ', '_'
-	append_and_replace(&event.Buffer, string_to_bytes(key), space, underscore)
+	append_and_escape(&event.Buffer, key)
 	event.Buffer = append(event.Buffer, '=', '[')
 	for _, v := range vals {
-		event.Buffer = append(event.Buffer, space)
+		event.Buffer = append(event.Buffer, ' ')
 		event.Buffer = append(event.Buffer, string_to_bytes(v)...)
 	}
-	event.Buffer = append(event.Buffer, space, ']', space)
+	event.Buffer = append(event.Buffer, ' ', ']', Log_Component_Separator)
 	return event
 }
 func (event *Log_Event) Data(key, val string) *Log_Event {
 	if event == nil {
 		return nil
 	}
-	var space, underscore byte = ' ', '_'
-	append_and_replace(&event.Buffer, string_to_bytes(key), space, underscore)
+	append_and_escape(&event.Buffer, key)
 	event.Buffer = append(event.Buffer, '=')
-	event.Buffer = append(event.Buffer, string_to_bytes(val)...)
-	event.Buffer = append(event.Buffer, ' ')
-	return event
-}
-func (event *Log_Event) Data_Quoted(key, val string) *Log_Event {
-	if event == nil {
-		return nil
-	}
-	var space, underscore byte = ' ', '_'
-	append_and_replace(&event.Buffer, string_to_bytes(key), space, underscore)
-	event.Buffer = append(event.Buffer, '=', '"')
-	append_and_replace(&event.Buffer, string_to_bytes(val), '"', '\\', '"') 
-	event.Buffer = append(event.Buffer, '"', ' ')
+	append_and_escape(&event.Buffer, val)
+	event.Buffer = append(event.Buffer, Log_Component_Separator)
 	return event
 }
 func (event *Log_Event) Begin(msg string) { if event == nil { return }; event.Msg("begin "+msg) }
@@ -1149,6 +1128,7 @@ func (event *Log_Event) Message(msg string) *Log_Event {
 	}
 	start := Log_Time_Capacity + len(" ") + Log_Level_Capacity + len(" ")
 	end   := start + Log_Message_Capacity
+	assert(end - start < len(event.Buffer), "length shouild've been unsafely set past the empty message sub buffer during the log event initialization")
 	message_buffer := event.Buffer[start:end]
 	if len(msg) <= Log_Message_Capacity { 
 		for offset := range msg {
@@ -1170,14 +1150,28 @@ func (event *Log_Event) Message(msg string) *Log_Event {
 	}
 	return event
 }
-func (event *Log_Event) Msg  (message string) { if event == nil { return }; event.Message(message).Send() }
-func (event *Log_Event) Fatal(message string) { if event == nil { return }; event.Message("fatal: "+ message).Send(); os.Exit(1) }
+
+
 func (event *Log_Event) Send() {
 	if event == nil {
 		return
 	}
 	defer deinit_log_event(event)
 	event.Buffer = append(event.Buffer, '\n')
+	if _, err := Log_Writer.Write(event.Buffer); err != nil {
+		Log_Writer.Write(string_to_bytes("could not write log event"))
+	}
+
+
+	// assert after writing to make it more convenient to see what event.Buffer contained
+	after_time_index    := Log_Time_Capacity + 1
+	after_level_index   := after_time_index  + Log_Level_Capacity + 1
+	after_message_index := after_level_index + Log_Message_Capacity + 1
+
+
+	assert(event.Buffer[after_time_index    - 1 ] == Log_Component_Separator, "missing separator after time component")
+	assert(event.Buffer[after_level_index   - 1 ] == Log_Component_Separator, "missing separator after level component")
+	assert(event.Buffer[after_message_index - 1 ] == Log_Component_Separator, "missing separator after message component")
 	assert(func() bool {
 		for offset := range event.Buffer {
 			if event.Buffer[offset] == 0 {
@@ -1185,10 +1179,19 @@ func (event *Log_Event) Send() {
 			}
 		}
 		return true
-	}())
-	if _, err := Log_Writer.Write(event.Buffer); err != nil {
-		Log_Writer.Write(string_to_bytes("could not write log event"))
+	}(), "final log event does not contain null bytes")
+}
+
+
+func (event *Log_Event) Message_Sub_Buffer() []byte {
+	if event == nil {
+		return nil
 	}
+	start := Log_Time_Capacity + len("|") + Log_Level_Capacity + len("|")
+	end   := start + Log_Message_Capacity
+	assert(end - start == Log_Message_Capacity)
+	assert(end + start < Log_Default_Buffer_Capacity)
+	return event.Buffer[start:end]
 }
 
 
@@ -1220,29 +1223,29 @@ func init_log_event(logger *Logger, log_level_str string) *Log_Event {
 	event.Buffer = append_zero_padded_int(event.Buffer, t.Minute())
 	event.Buffer = append(event.Buffer, ':')
 	event.Buffer = append_zero_padded_int(event.Buffer, t.Second())
-	event.Buffer = append(event.Buffer, 'Z', ' ')
+	event.Buffer = append(event.Buffer, 'Z', Log_Component_Separator)
 
 
-	// assert.Always(strings.HasSuffix(log_level_str, " "))
-	// assert.Always(len(log_level_str) == 6)
+	longest_log_level_word := "DEBUG"
+	assert(len(log_level_str) == len(longest_log_level_word+string(Log_Component_Separator)))
+	assert(strings.HasSuffix(log_level_str, string(Log_Component_Separator)))
 	event.Buffer = append(event.Buffer, string_to_bytes(log_level_str)...)
 
 
 	// Set the slice length past the Msg() portion, starting at the context.
 	element_size := int(unsafe.Sizeof(event.Buffer[0]))
-	space := 1
 	previous := (*reflect.SliceHeader)(unsafe.Pointer(&event.Buffer))
 	current  := reflect.SliceHeader{
 		Data: previous.Data,
 		Cap:  previous.Cap, // doesn't matter because we must stay within the capacity
 		Len: 
-			Log_Time_Capacity    * element_size + space * element_size +
-			Log_Level_Capacity   * element_size + space * element_size +
-			Log_Message_Capacity * element_size,
+			(len(event.Buffer) + Log_Message_Capacity) * element_size,
 	}
 	event.Buffer = *(*[]byte)(unsafe.Pointer(&current))
+	assert(len(event.Buffer) <= cap(event.Buffer))
+	// ensure that the component separator after message is set here because its possible to Send a log event without invoking Message() or Data()
+	event.Buffer = append(event.Buffer, Log_Component_Separator)
 	event.Buffer = append(event.Buffer, logger.Buffer...)
-	event.Buffer = append(event.Buffer, ' ')
 	return event
 }
 
@@ -1280,14 +1283,13 @@ var Log_Event_Pool = &sync.Pool{
 func string_to_bytes(s string) []byte {
 	return unsafe.Slice(unsafe.StringData(s), len(s))
 }
-func append_and_replace(dst *[]byte, src []byte, old byte, new ...byte) {
+func append_and_escape(dst *[]byte, src string) {
 	for offset := 0; offset < len(src); offset += 1 {
 		ch := src[offset]
-		if ch == old {
-			*dst = append(*dst, new...)
-		} else {
-			*dst = append(*dst, ch)
+		if ch == '=' || ch == Log_Component_Separator {
+			*dst = append(*dst, '\\')
 		}
+		*dst = append(*dst, ch)
 	}
 }
 
