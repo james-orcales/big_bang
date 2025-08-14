@@ -7,6 +7,7 @@ if status is-interactive
         abbr --add l  lazygit
         abbr --add lc lazygit --git-dir=$HOME/.cfg/ --work-tree=$HOME
         abbr --add gco git clone --depth=1 --no-single-branch
+        abbr --add --set-cursor=!! gmt git commit --allow-empty --message \"!!\"
 
         abbr --add t zoxide_cd
 
