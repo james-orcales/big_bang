@@ -1,96 +1,37 @@
-dotfiles
-========
+# big bang
+
 thy dots and scripts
 
-There's a comprehensive README for these aspects of my config:
-1. [Keyboard Layout Configuration (XKB)][xkb]
+## Installation Script
 
-Dotfiles Management
--------------------
-I track my dotfiles through a git bare repository with its working directory set to the home directory.
+I aim to keep my setup fully reproducible, provided I can create a new user on an existing system (MacOS, Debian, or NixOS). The process starts with
+`big_bang.sh`, which handles all system-wide configuration and downloads a pinned version of Go.
 
-```sh
-git init --bare $HOME/.cfg
-alias config='/usr/bin/git --git-dir=$HOME/.cfg/ --work-tree=$HOME'
-config config --local status.showUntrackedFiles no
-echo "alias config='/usr/bin/git --git-dir=$HOME/.cfg/ --work-tree=$HOME'" >> $HOME/.bashrc
-echo "*" > $HOME/.gitignore
-```
+Once the initial setup is complete, it runs: `go run ./big_bang.go`. This script manages my dotfiles and user-level dependencies—essentially, my core
+development tools.
 
-Theming
--------
+The dotfiles directory is a mirror of the home directory, but syncing is one-way: it creates or overwrites files in `$HOME` without deleting anything that isn’t
+in dotfiles. This means that if you remove a file from dotfiles, it will remain in the actual home directory until you delete it manually. This approach avoids
+using symlinks altogether.
 
-### GTK - Dracula <img src="https://github.com/dracula/draculatheme.com/blob/ad815d12958b530c842525a0de7671388ebe8cca/public/static/icons/used/pack-1/045-dracula.svg" height="25">
-<https://draculatheme.com/gtk>
+A notable detail in big_bang.go is a custom 400-line logger I wrote, inspired by Zerolog, offering similar performance with zero heap allocations.
 
-### Icon Pack - Papirus
-<https://github.com/PapirusDevelopmentTeam/papirus-icon-theme>
+## Dependencies
 
-### Cursor Theme - Bibata Modern Ice
-<https://github.com/ful1e5/Bibata_Cursor>
+I'd like to write a comprehensive discussion on my core dev tools, but for now I'll just say that if I could only have two, I'd need `nvim` and `fzf`.
 
-### Font - 0xProto
-<https://github.com/0xType/0xProto>
+## Theming
 
-### Color Palette - Dracula <img src="https://github.com/dracula/draculatheme.com/blob/ad815d12958b530c842525a0de7671388ebe8cca/public/static/icons/used/pack-1/045-dracula.svg" height="25">
+### Font - Nerd Font JetBrains Mono
+I originally used Iosevka for its thinner typeface, which allowed more columns to fit in my terminal—useful when splitting the window vertically in tmux. After
+changing my workflow to use only full-width windows, that benefit became irrelevant. With JetBrains Mono, I can already fit over 200 columns on my screen, so
+font choice no longer affects my workflow.
 
-#### Official Dracula
+It doesn’t even matter if the font is a Nerd Font, as I’m not particularly fond of code ligatures—though I’m not bothered enough to disable them. If I ever
+needed a fallback, I’d pick Hurmit Nerd Font, as its braces, parentheses, and brackets are highly distinguishable from one another.
 
-<https://draculatheme.com/contribute>
+### Color Palette  - Rose Pine
 
-#### Dracula Soft by Mofiqul
-<https://github.com/Mofiqul/dracula.nvim/blob/main/lua/dracula/palette-soft.lua>
-
-   - Background - ![#292A35][background] `#292A35`
-   - Foreground - ![#F6F6F5][foreground] `#F6F6F5`
-   - Selection (ANSI 8) - ![#7C7F8A][selection] `#7C7F8A`
-   - Orange - ![#FDC38E][orange] `#FDC38E`
-   - Black - ![#1C1C1C][black] `#1C1C1C`
-   - Red - ![#DD6E6B][red] `#DD6E6B`
-   - Green - ![#87E58E][green] `#87E58E`
-   - Yellow - ![#E8EDA2][yellow] `#E8EDA2`
-   - Blue - ![#BAA0E8][blue] `#BAA0E8 `
-   - Pink - ![#E48CC1][pink] `#E48CC1`
-   - Cyan - ![#A7DFEF][cyan] `#A7DFEF`
-   - White - ![#F6F6F5][white] `#F6F6F5`
-   - Bright Red - ![#E1837F][bright_red] `#E1837F`
-   - Bright Green - ![#97EDA2][bright_green] `#97EDA2`
-   - Bright Yellow - ![#F6F6B6][bright_yellow] `#F6F6B6`
-   - Bright Blue - ![#D0B5F3][bright_blue] `#D0B5F3`
-   - Bright Magenta - ![#E7A1D7][bright_magenta] `#E7A1D7`
-   - Bright Cyan - ![#BCF4F5][bright_cyan] `#BCF4F5`
-   - Bright White - ![#FFFFFF][bright_white] `#FFFFFF`
-
-[background]: https://dummyimage.com/15x15/292a35/fff.png&text=+
-[foreground]: https://dummyimage.com/15x15/F6F6F5/fff.png&text=+
-[selection]: https://dummyimage.com/15x15/7C7F8A/fff.png&text=+ 
-[orange]: https://dummyimage.com/15x15/FDC38E/fff.png&text=+ 
-[black]: https://dummyimage.com/15x15/1C1C1C/fff.png&text=+ 
-[red]: https://dummyimage.com/15x15/DD6E6B/fff.png&text=+ 
-[green]: https://dummyimage.com/15x15/87E58E/fff.png&text=+ 
-[blue]: https://dummyimage.com/15x15/BAA0E8/fff.png&text=+ 
-[yellow]: https://dummyimage.com/15x15/E8EDA2/fff.png&text=+ 
-[pink]: https://dummyimage.com/15x15/E48CC1/fff.png&text=+ 
-[cyan]: https://dummyimage.com/15x15/A7DFEF/fff.png&text=+ 
-[white]: https://dummyimage.com/15x15/F6F6F5/fff.png&text=+ 
-[bright_red]: https://dummyimage.com/15x15/E1837F/fff.png&text=+ 
-[bright_green]: https://dummyimage.com/15x15/97EDA2/fff.png&text=+ 
-[bright_yellow]: https://dummyimage.com/15x15/F6F6B6/fff.png&text=+ 
-[bright_blue]: https://dummyimage.com/15x15/D0B5F3/fff.png&text=+ 
-[bright_magenta]: https://dummyimage.com/15x15/E7A1D7/fff.png&text=+ 
-[bright_cyan]: https://dummyimage.com/15x15/BCF4F5/fff.png&text=+ 
-[bright_white]: https://dummyimage.com/15x15/FFFFFF/fff.png&text=+ 
-
-Acknowledgement
----------------
-### Git Bare Repo
-- Found this out through [mhdzli][mhdzli]
-- The guy who might've done this first. ([source][gitbare-firstguy])
-- A much more polished resource. ([source][gitbare-polished])
-- Suggested `echo "*" > $HOME/.gitignore` so you have to force add files. ([source][gitbare-gitignore])
-
-[xkb]: https://github.com/amesaine/colejak
-[mhdzli]: https://github.com/mhdzli/dotfiles#managing-dotfiles-with-git-bare-repo
-[gitbare-firstguy]: https://news.ycombinator.com/item?id=11070797
-[gitbare-polished]: https://www.atlassian.com/git/tutorials/dotfiles
-[gitbare-gitignore]: https://coffeeaddict.dev/how-to-manage-dotfiles-with-git-bare-repo 
+Yes, even with colorschemes, there’s value in minimizing “dependencies”—both in how syntax highlighting is implemented and in deciding what actually needs
+highlighting. I now stick to simple regex-based highlighting. Treesitter is powerful, but it’s a heavy dependency with performance issues on large files. LSPs
+share similar drawbacks, and I’ve moved away from them entirely.
