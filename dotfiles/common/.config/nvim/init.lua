@@ -1,5 +1,5 @@
 require 'keymap'
-require 'set'
+require 'option'
 require 'colorscheme'
 require 'autocmd'
 -- prefixed with `folke` to avoid clashing with `lazy` plugin.
