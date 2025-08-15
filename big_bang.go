@@ -858,7 +858,7 @@ https://patorjk.com/software/taag/#p=display&v=0&f=ANSI%20Shadow&t=logger
 
 This is a performant, zero-allocation, minimal (~400 LoC) logger heavily inspired by ZeroLog. As of August 15, 2025, Zerolog has ~16,000 LoC.
 It serves two main purposes:
-1. Eliminate external logger dependencies by emulating only the core API to maximize portability.
+1. Eliminate external logger dependencies by emulating only their core API to maximize portability.
 2. Support only one log format. I personally prefer logfmt over JSON. In this case, I implemented a custom dialect of logfmt where the most useful information
 are prepended to the logs for quick debugging.
 
@@ -888,6 +888,7 @@ Design Decisions:
 */
 
 
+// Not thread-safe by default.
 var Log_Writer io.Writer = os.Stdout
 const (
 	// These defaults cover most cases. Note that these buffers can still grow when the need arises, in which case, they don't get returned to the
@@ -1066,6 +1067,10 @@ func (event *Log_Event) Data(key, val string) *Log_Event {
 	event.Buffer = append(event.Buffer, Log_Component_Separator)
 	return event
 }
+
+
+// Message is meant to be a short summary of your log entry, similar to a git commit message. 
+// If msg is longer than 100 characters, it gets truncated with the indicator "...".
 func (event *Log_Event) Message(msg string) *Log_Event {
 	if event == nil {
 		return nil
@@ -1103,7 +1108,7 @@ func (event *Log_Event) Send() {
 	defer deinit_log_event(event)
 	event.Buffer = append(event.Buffer, '\n')
 	if _, err := Log_Writer.Write(event.Buffer); err != nil {
-		Log_Writer.Write(string_to_bytes("could not write log event"))
+		os.Stderr.Write(string_to_bytes("WRITE_ERROR|could not write log event"))
 	}
 
 
