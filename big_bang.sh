@@ -265,11 +265,11 @@ install_cargo() {
                 print "cargo, rustup, and rustc are already installed"
                 return 0
         fi
-        if !has_prefix "$CARGO_HOME" "$BIG_BANG_ROOT"; then
+        if ! has_prefix "$CARGO_HOME" "$BIG_BANG_ROOT"; then
                 print "CARGO_HOME is not within big bang directory: got $CARGO_HOME"
                 return 1
         fi
-        if !has_prefix "$RUSTUP_HOME" "$BIG_BANG_ROOT"; then
+        if ! has_prefix "$RUSTUP_HOME" "$BIG_BANG_ROOT"; then
                 print "RUSTUP_HOME is not within big bang directory: got $RUSTUP_HOME"
                 return 1
         fi
