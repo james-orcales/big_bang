@@ -26,17 +26,29 @@ noop() {
 	:
 }
 
-println() {
+print() {
         printf '%s\n' "$*"
 }
 
+has_prefix() {
+        if [ "$2" = "" ]; then
+                print "has_prefix: prefix argument is missing"
+                return 1
+        fi
+        case "$1" in
+        "$2"*) return 0 ;;
+        *)     return 1 ;;
+        esac
+}
+
 env_setup() { 
+	print "setting up environment"
         operating_system="$(uname)"
         cpu_architecture="$(uname -m)"
         if ! { test "$operating_system" = 'Darwin' && test "$cpu_architecture" = "arm64";  } &&
            ! { test "$operating_system" = 'Linux'  && test "$cpu_architecture" = "x86_64"; }
         then
-                println "system is unsupported. got: $operating_system and $cpu_architecture"
+                print "system is unsupported. got: $operating_system and $cpu_architecture"
                 exit 1
         fi
 
@@ -90,30 +102,26 @@ export PATH="$BIG_BANG_BIN:$PATH"
 
 export MANPATH="$BIG_BANG_MAN:$MANPATH"
 
-if command -v fish >/dev/null; then
+if command -v fish >/dev/null && test "$EXIT_OUT_OF_FISH" = ""; then
         fish
 fi
 EOF
                 if ! cmp -z --quiet "$HOME/.zshenv" "$tmp_zshenv"; then
-                        println "updating .zshenv"
+                        print "updating .zshenv"
                         cat "$tmp_zshenv" > "$HOME/.zshenv"
+                        print "Sourcing .zshenv"
+                        . "$HOME/.zshenv" || { print 'failed to source .zshenv'; exit 1; }
                 fi
                 if ! cmp -z --quiet "$HOME/.zprofile" "$tmp_zprofile"; then
-                        println "updating .zprofile"
+                        print "updating .zprofile"
                         cat "$tmp_zprofile" > "$HOME/.zprofile"
-                fi
-                if ! . "$HOME/.zshenv"; then
-                        println 'failed to source .zshenv'
-                        exit 1
-                fi
-                if ! . "$HOME/.zprofile"; then
-                        println 'failed to source .zprofile'
-                        exit 1
+                        print "Sourcing .zprofile"
+                        EXIT_OUT_OF_FISH=1 . "$HOME/.zprofile" || { print 'failed to source .zprofile'; exit 1; }
                 fi
                 ;;
         'Linux')
                 # TODO: hardcode .profile and .bashrc inside here
-                println "havent setup bash env setup yet"
+                print "havent setup bash env setup yet"
                 exit 1
                 ;;
         *)
@@ -121,15 +129,13 @@ EOF
         esac
 
         if test "$(pwd)" != "$BIG_BANG_GIT_ROOT"; then
-                println "you probably did not clone the repo into $BIG_BANG_GIT_ROOT"
+                print "you probably did not clone the repo into $BIG_BANG_GIT_ROOT"
                 exit 1
         fi
-        test  -d "$BIG_BANG_DOTFILES" || { println "$BIG_BANG_DOTFILES should've been included when you cloned the repository"; exit 1; }
         mkdir -p "$BIG_BANG_BIN"           &&
                 mkdir -p "$BIG_BANG_SHARE" &&
                 mkdir -p "$BIG_BANG_TMP"   ||
-                { println "failed to create essential directories"; exit 1; }
-	println "done env setup"
+                { print "failed to create essential directories"; exit 1; }
         return 0
 }
 
@@ -149,9 +155,9 @@ github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAA
 github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
 EOF
         if ! test -f "$HOME/.ssh/id_ed25519"; then
-                println "Generating ssh key"
+                print "Generating ssh key: id_ed25519"
                 if ! ssh-keygen -t ed25519 -C "dja.orcales@gmail.com"; then 
-                        println "failed to generate ssh key"
+                        print "failed to generate ssh key"
                         return 1
                 fi
 
@@ -161,8 +167,8 @@ EOF
 
                 pbcopy < $HOME/.ssh/id_ed25519.pub
                 cat "$HOME/.ssh/id_ed25519.pub"
-                println "$HOME/.ssh/id_ed25519.pub has been copied to the clipboard."
-                println "Go to https://github.com/settings/keys and add your new key. Press [ENTER] when done."
+                print "$HOME/.ssh/id_ed25519.pub has been copied to the clipboard."
+                print "Go to https://github.com/settings/keys and add your new key. Press [ENTER] when done."
                 read
         fi
         return 0
@@ -186,37 +192,37 @@ install_golang() {
                 go_release_checksum='d3847fef834e9db11bf64e3fb34db9c04db14e068eeb064f49af747010454f90'
                 go_version_expected_output="go version go$go_version linux/amd64"
         else
-                println "invalid GOOS: $operating_system"
+                print "invalid GOOS: $operating_system"
                 return 1
         fi
 
-        case "$(command -v go)" in 
-        $BIG_BANG_ROOT*)
+        if has_prefix "$(command -v go)" "$BIG_BANG_ROOT"; then
                 go_version_actual_output="$(go version 2>/dev/null)"
-                if test "$go_version_actual_output" = "$go_version_expected_output"; then
-                        println "golang v$go_version already installed"
+                if [ "$go_version_actual_output" = "$go_version_expected_output" ]; then
+                        print "golang v$go_version is already installed"
                         return 0
+                else
+                        print "golang installation is the wrong version"
                 fi
-                ;;
-        esac
-        println "downloading go"
+        fi
+        print "downloading go"
         download_location="$BIG_BANG_TMP/$go_release"
         download_url="https://go.dev/dl/$go_release"
         if ! curl --fail --show-error --location --retry 10 --output "$download_location" -- "$download_url"; then
-                println "failed to download go binary: $download_url"
+                print "failed to download go binary: $download_url"
                 return 1
         fi
         if ! sha256 --quiet --check="$go_release_checksum" -- "$download_location"; then
-                println "checksum mismatch for $go_release"
+                print "checksum mismatch for $go_release"
                 return 1
         fi
         if ! tar --extract --gzip --file="$download_location" --directory="$BIG_BANG_SHARE"; then
-                println "failed to extract $go_release"
+                print "failed to extract $go_release"
                 return 1
         fi
 
         if test "$(go version)" != "$go_version_expected_output"; then
-                println "go version produced unexpected result. got: $(go version). expected: $go_version_expected_output"
+                print "go version produced unexpected result. got: $(go version). expected: $go_version_expected_output"
                 return 1
         fi
 
@@ -224,12 +230,116 @@ install_golang() {
         return 0
 }
 
+install_homebrew() {
+          if [ "$operating_system" != "Darwin" ] || command -v brew > /dev/null; then
+                    print "homebrew is already installed"
+                    return 0
+          fi
+          if [ "$HOMEBREW_BUNDLE_FILE" = "" ]; then
+                    print "HOMEBREW_BUNDLE_FILE is not set"
+                    return 0
+          fi
+          print "installing homebrew"
+          if ! NONINTERACTIVE=1 /bin/bash -c "$(curl --fail --silent --show-error --location https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          then
+                    return 1
+          fi
+          cat > "$HOMEBREW_BUNDLE_FILE" <<'EOF'
+cask "ghostty"
+cask "firefox"
+cask "microsoft-edge"
+cask "cryptomator"
+cask "veracrypt"
+cask "karabiner-elements"
+cask "obs"
+EOF
+          brew bundle install
+          return 0
+}
+
+install_cargo() {
+        if has_prefix      "$(command -v cargo)"  "$BIG_BANG_ROOT" &&
+                has_prefix "$(command -v rustup)" "$BIG_BANG_ROOT" &&
+                has_prefix "$(command -v rustc)"  "$BIG_BANG_ROOT"
+        then
+                print "cargo, rustup, and rustc are already installed"
+                return 0
+        fi
+        if !has_prefix "$CARGO_HOME" "$BIG_BANG_ROOT"; then
+                print "CARGO_HOME is not within big bang directory: got $CARGO_HOME"
+                return 1
+        fi
+        if !has_prefix "$RUSTUP_HOME" "$BIG_BANG_ROOT"; then
+                print "RUSTUP_HOME is not within big bang directory: got $RUSTUP_HOME"
+                return 1
+        fi
+        print "installing cargo"
+        return curl --proto '=https' --tlsv1.2 --silent --show-error --fail https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain=stable
+}
+
+system_preferences() {
+          if [ "$operating_system" != "Darwin" ]; then
+                    return 0
+          fi
+          defaults write com.apple.dock autohide               -bool   "true"
+          defaults write com.apple.dock autohide-delay         -float  0
+          defaults write com.apple.dock autohide-time-modifier -int    0
+          defaults write com.apple.dock "orientation"          -string "left"
+          defaults write com.apple.dock "show-recents"         -bool   "false"
+          killall Dock
+
+          defaults write com.apple.finder "AppleShowAllExtensions"  -bool   "true"
+          defaults write com.apple.finder "AppleShowAllFiles"       -bool   "true"
+          defaults write com.apple.finder "AppleShowScrollBars"     -bool   "true"
+          defaults write com.apple.finder "ShowPathbar"             -bool   "true"
+          defaults write com.apple.finder "ShowStatusBar"           -bool   "true"
+          defaults write com.apple.finder "NewWindowTarget"         -string "Home"
+          defaults write com.apple.finder "FXPreferredViewStyle"    -string "Nlsv"
+          defaults write com.apple.finder "FXDefaultSearchScope"    -string "SCcf"
+          defaults write com.apple.finder "_FXSortFoldersFirst"     -bool   "true"
+          defaults write com.apple.finder "_FXShowPosixPathInTitle" -bool   "true"
+          killall  Finder
+
+          defaults write com.apple.screensaver "askForPassword"      -int 1
+          defaults write com.apple.screensaver "askForPasswordDelay" -int 0
+
+          defaults write com.apple.AdLib "allowApplePersonalizedAdvertising" -bool "false"
+
+          # Avoid creating .DS_Store files on network or USB volumes
+          defaults write com.apple.desktopservices "DSDontWriteNetworkStores" -bool "true"
+          defaults write com.apple.desktopservices "DSDontWriteUSBStores"     -bool "true"
+
+          # Check for software updates daily, not just once per week
+          defaults write com.apple.SoftwareUpdate "AutomaticCheckEnabled" -bool "true"
+          defaults write com.apple.SoftwareUpdate "ScheduleFrequency"     -int  1
+          defaults write com.apple.SoftwareUpdate "AutomaticDownload"     -int  0
+          defaults write com.apple.SoftwareUpdate "CriticalUpdateInstall" -int  1
+
+          defaults write com.apple.menuextra.clock "DateFormat" -string "\"EEE MMM d HH:mm\""
+
+          defaults write NSGlobalDomain com.apple.mouse.linear                 -bool   "true"
+          defaults write NSGlobalDomain "WebKitDeveloperExtras"                -bool   "true"
+          defaults write NSGlobalDomain "AppleShowScrollBars"                  -string "always"
+          defaults write NSGlobalDomain "NSAutomaticCapitalizationEnabled"     -bool   "false"
+          defaults write NSGlobalDomain "NSAutomaticDashSubstitutionEnabled"   -bool   "false"
+          defaults write NSGlobalDomain "NSAutomaticInlinePredictionEnabled"   -bool   "false"
+          defaults write NSGlobalDomain "NSAutomaticPeriodSubstitutionEnabled" -bool   "false"
+          defaults write NSGlobalDomain "NSAutomaticQuoteSubstitutionEnabled"  -bool   "false"
+          defaults write NSGlobalDomain "NSAutomaticSpellingCorrectionEnabled" -bool   "false"
+          return 0
+}
+
 
 main() {
-        env_setup            || { println "error during env setup";  exit 1; }
-        install_golang       || { println "error installing go";     exit 1; }
-        setup_ssh            || { println "error during ssh setup";  exit 1; }
-        go run ./big_bang.go || { println "error running go script"; exit 1; }
+        env_setup            || { print "error during env setup";           exit 1; }
+        install_golang       || { print "error installing go";              exit 1; }
+        install_homebrew     || { print "error installing homebrew";        exit 1; }
+        install_cargo        || { print "error installing homebrew";        exit 1; }
+        setup_ssh            || { print "error during ssh setup";           exit 1; }
+        system_preferences   || { print "error setting system preferences"; exit 1; }
+        go run ./big_bang.go || { print "error running go script";          exit 1; }
+
+        exit 0
 }
 
 

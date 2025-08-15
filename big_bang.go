@@ -66,7 +66,6 @@ var (
 	BIG_BANG_TMP         = filepath.Clean(os.Getenv("BIG_BANG_TMP"))
 	CARGO_HOME           = filepath.Clean(os.Getenv("CARGO_HOME"))
 	RUSTUP_HOME          = filepath.Clean(os.Getenv("RUSTUP_HOME"))
-	HOMEBREW_BUNDLE_FILE = filepath.Clean(os.Getenv("HOMEBREW_BUNDLE_FILE"))
 
 
 	// A mirror of the home directory but only hosts dotfiles.
@@ -89,95 +88,9 @@ var (
 
 // TODO: Have checksums for artifacts list and homebrew list where you're forced to update these manually just like with nix. This would need type
 // 	 Artifact to implement Stringer
-// TODO: setup ssh
 func main() {
 	// TODO: man pages. `foo.1-8``
 	artifacts := []Artifact{
-		{
-			Name: "brew",
-			System_Wide: true, 
-			Install: func(logger *Logger) {
-				if path := which("brew"); path != "" {
-					logger.Info().Msg("homebrew is already installed")
-					return 
-				} else {
-					logger.Info().Begin("installing")
-					defer logger.Info().Done("installing")
-					if err := execute("", nil, "sudo", "--validate"); err != nil {
-						logger.Error(err).Msg("user must be an administrator to install homebrew")
-						return
-					}
-					if err := execute("",
-						[]string{"NONINTERACTIVE=1"},
-						"/bin/bash", "-c", 
-						`$(curl --fail --silent --show-error --location 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')`,
-					); err != nil {
-						logger.Error(err).Msg("brew installation script")
-						return
-					}
-				}
-				brew_file := `
-					cask "ghostty"
-					cask "firefox"
-					cask "microsoft-edge"
-					cask "cryptomator"
-					cask "veracrypt"
-					cask "karabiner-elements"
-					cask "obs"
-				`
-				assert(filepath.IsAbs(HOMEBREW_BUNDLE_FILE))
-				if err := os.WriteFile(HOMEBREW_BUNDLE_FILE, []byte(brew_file), 0644); err != nil {
-					logger.Error(err).Msg("creating brewfile")
-					return
-				}
-				if err := execute("", nil, "brew", "bundle", "install", "--quiet", "--file", HOMEBREW_BUNDLE_FILE); err == nil {
-					return
-				}
-			},
-		},
-		{
-			Name: "cargo",
-			Install: func(logger *Logger) {
-				has_missing_dependency := false
-				for _, dependency := range []string {
-					"rustup",
-					"cargo",
-					"rustc",
-				} {
-					if path := which(dependency); path != "" {
-						assert(filepath.IsAbs(path))
-						assert(filepath.IsAbs(BIG_BANG_ROOT))
-						if !strings.HasPrefix(path, BIG_BANG_ROOT) {
-							has_missing_dependency = true
-							break
-						}
-					} else {
-						has_missing_dependency = true
-						break
-					}
-				}
-				if !has_missing_dependency {
-					return
-				}
-				logger.Info().Begin("installing cargo")
-				defer logger.Info().Done("installing cargo")
-				assert(slices.Contains(PATH,filepath.Clean(filepath.Join(CARGO_HOME, "bin"))))
-				if path := which("curl"); path == "" {
-					assert(filepath.IsAbs(path))
-					assert(filepath.IsAbs(BIG_BANG_ROOT))
-					logger.Error().Msg("curl is needed to install rustup")
-					return
-				}
-				if err := execute("", nil, 
-                                        "sh", "-c", 
-					`curl --proto '=https' --tlsv1.2 --silent --show-error --fail https://sh.rustup.rs | 
-					 	sh -s -- -y --no-modify-path --default-toolchain=stable`,
-				); err != nil {
-					logger.Error(err).Msg("installing rustup")
-					return
-				}
-			},
-		},
 		{
 			Name:    "fish",
 			Install: func(logger *Logger) {
@@ -373,150 +286,148 @@ func main() {
 	}
 
 
-	func() {
-		type Info struct {
-			description string
-			action      func()
-		}
-		commands := map[string]Info{
-			"dotfiles_check": Info{
-				description: "checks if actual dotfiles match those in big_bang/dotfiles",
-				action: func() {
-					files_set := mismatched_dotfiles(logger)
-					if len(files_set) == 0 {
-						logger.Info().Msg("no mismatches found")
-					} else {
-						files := make([]string, 0, len(files_set))
-						for file := range files_set {
-							files = append(files, file)
-						}
-						logger.Info().Int("count", len(files)).List("file", files...).Msg("found mismatches")
+	type Info struct {
+		description string
+		action      func()
+	}
+	commands := map[string]Info{
+		"dotfiles_check": Info{
+			description: "checks if actual dotfiles match those in big_bang/dotfiles",
+			action: func() {
+				files_set := mismatched_dotfiles(logger)
+				if len(files_set) == 0 {
+					logger.Info().Msg("no mismatches found")
+				} else {
+					files := make([]string, 0, len(files_set))
+					for file := range files_set {
+						files = append(files, file)
 					}
-				},
+					logger.Info().Int("count", len(files)).List("file", files...).Msg("found mismatches")
+				}
 			},
-			"dotfiles_sync": Info{
-				description: "Synchronizes dotfiles from big_bang/dotfiles to $HOME by creating missing files or truncating existing files. It will never delete other files.",
-				action: func() {
-					files := mismatched_dotfiles(logger)
-					if len(files) == 0 {
-						logger.Info().Msg("dotfiles are already synced")
+		},
+		"dotfiles_sync": Info{
+			description: "Synchronizes dotfiles from big_bang/dotfiles to $HOME by creating missing files or truncating existing files. It will never delete other files.",
+			action: func() {
+				files := mismatched_dotfiles(logger)
+				if len(files) == 0 {
+					logger.Info().Msg("dotfiles are already synced")
+					return
+				}
+				logger.Info().Begin("syncing dotfiles")
+				defer logger.Info().Done("syncing dotfiles")
+				for relative_path := range files {
+					assert(!filepath.IsAbs(relative_path))
+					var err_sync = func() error {
+						src := filepath.Join(big_bang_dotfiles_os_specific, relative_path)
+						if !file_exists(src) {
+							src = filepath.Join(big_bang_dotfiles_common, relative_path)
+						}
+						assert(!is_dir(src))
+						contents, err := os.ReadFile(src)
+						if err != nil {
+							return err
+						}
+						dst := filepath.Join(HOME, relative_path)
+						if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+							return err
+						}
+						if err := os.WriteFile(filepath.Join(HOME, relative_path), contents, 0644); err != nil {
+							return err
+						}
+						logger.Info().Str("file", strings.TrimPrefix(src, big_bang_dotfiles)).Msg("updated dotfile")
+						return nil
+					}()
+					if err_sync != nil {
+						logger.Error(err_sync).Msg("syncing dotfiles")
 						return
 					}
-					logger.Info().Begin("syncing dotfiles")
-					defer logger.Info().Done("syncing dotfiles")
-					for relative_path := range files {
-						assert(!filepath.IsAbs(relative_path))
-						var err_sync = func() error {
-							src := filepath.Join(big_bang_dotfiles_os_specific, relative_path)
-							if !file_exists(src) {
-								src = filepath.Join(big_bang_dotfiles_common, relative_path)
-							}
-							assert(!is_dir(src))
-							contents, err := os.ReadFile(src)
-							if err != nil {
-								return err
-							}
-							dst := filepath.Join(HOME, relative_path)
-							if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
-								return err
-							}
-							if err := os.WriteFile(filepath.Join(HOME, relative_path), contents, 0644); err != nil {
-								return err
-							}
-							logger.Info().Str("file", strings.TrimPrefix(src, big_bang_dotfiles)).Msg("updated dotfile")
-							return nil
-						}()
-						if err_sync != nil {
-							logger.Error(err_sync).Msg("syncing dotfiles")
+				}
+			},
+		},
+		"dependencies_download": Info{
+			description: "dependencies of which the binary can be downloaded directly will be saved in BIG_BANG_ROOT/download",
+			action: func() {
+				total_ctx, total_cancel := context.WithTimeout(context.Background(), time.Minute * 15)
+				defer total_cancel()
+				var wg sync.WaitGroup
+				defer wg.Wait()
+				for _, artifact := range artifacts {
+					if artifact.Download_Link == "" {
+						continue
+					}
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						individual_ctx, individual_cancel := context.WithTimeout(total_ctx, time.Minute * 3)
+						defer individual_cancel()
+						download_artifact(individual_ctx, artifact, filepath.Join(BIG_BANG_ROOT, "download"), logger)
+					}()
+				}
+			},
+		},
+		"dependencies_install":  Info{
+			description: "WIP",
+			action: func() {
+				total_ctx, total_cancel := context.WithTimeout(context.Background(), time.Minute * 15)
+				defer total_cancel()
+				var wg sync.WaitGroup
+				defer wg.Wait()
+				for _, artifact := range artifacts {
+					if artifact.Install != nil {
+						artifact.Install(logger.With_Str("artifact", artifact.Name))
+						continue
+					} 
+					assert(artifact.Download_Link != "", 
+						"artifacts without a custom install step means their binaries are downloaded directly",
+					)
+					if path := which(artifact.Name); strings.HasPrefix(path, BIG_BANG_ROOT) {
+						logger.Info().Str("artifact", artifact.Name).Msg("already installed")
+						continue
+					}
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						individual_ctx, individual_cancel := context.WithTimeout(total_ctx, time.Minute * 3)
+						defer individual_cancel()
+						download_path := download_artifact(individual_ctx, artifact, BIG_BANG_TMP, logger)
+						if download_path == "" {
 							return
 						}
-					}
-				},
-			},
-			"dependencies_download": Info{
-				description: "dependencies of which the binary can be downloaded directly will be saved in BIG_BANG_ROOT/download",
-				action: func() {
-					total_ctx, total_cancel := context.WithTimeout(context.Background(), time.Minute * 15)
-					defer total_cancel()
-					var wg sync.WaitGroup
-					defer wg.Wait()
-					for _, artifact := range artifacts {
-						if artifact.Download_Link == "" {
-							continue
-						}
-						wg.Add(1)
-						go func() {
-							defer wg.Done()
-							individual_ctx, individual_cancel := context.WithTimeout(total_ctx, time.Minute * 3)
-							defer individual_cancel()
-							download_artifact(individual_ctx, artifact, filepath.Join(BIG_BANG_ROOT, "download"), logger)
-						}()
-					}
-				},
-			},
-			"dependencies_install":  Info{
-				description: "WIP",
-				action: func() {
-					total_ctx, total_cancel := context.WithTimeout(context.Background(), time.Minute * 15)
-					defer total_cancel()
-					var wg sync.WaitGroup
-					defer wg.Wait()
-					for _, artifact := range artifacts {
-						if artifact.Install != nil {
-							artifact.Install(logger.With_Str("artifact", artifact.Name))
-							continue
-						} 
-						assert(artifact.Download_Link != "", 
-							"artifacts without a custom install step means their binaries are downloaded directly",
-						)
-						if path := which(artifact.Name); strings.HasPrefix(path, BIG_BANG_ROOT) {
-							logger.Info().Str("artifact", artifact.Name).Msg("already installed")
-							continue
-						}
-						wg.Add(1)
-						go func() {
-							defer wg.Done()
-							individual_ctx, individual_cancel := context.WithTimeout(total_ctx, time.Minute * 3)
-							defer individual_cancel()
-							download_path := download_artifact(individual_ctx, artifact, BIG_BANG_TMP, logger)
-							if download_path == "" {
-								return
-							}
-							install_artifact(artifact, download_path, logger)
-						}()
-					}
-				},
-			},
-		}
-		var print_help = func() {
-			fmt.Println("big bang replicates NixOS reproducibility on my work machines (MacOS, Debian, NixOS).")
-			fmt.Println("")
-			fmt.Println("Command Overview:")
-			var longest_command_length int
-			for command := range commands {
-				if len(command) > longest_command_length {
-					longest_command_length = len(command)
+						install_artifact(artifact, download_path, logger)
+					}()
 				}
-			}
-			assert(longest_command_length > 0)
-			for command, info := range commands {
-				fmt.Printf("%*s    %s\n", -longest_command_length, command, info.description)
+			},
+		},
+	}
+	var print_help = func() {
+		fmt.Println("big bang replicates NixOS reproducibility on my work machines (MacOS, Debian, NixOS).")
+		fmt.Println("")
+		fmt.Println("Command Overview:")
+		var longest_command_length int
+		for command := range commands {
+			if len(command) > longest_command_length {
+				longest_command_length = len(command)
 			}
 		}
-		if len(os.Args) <= 1 {
+		assert(longest_command_length > 0)
+		for command, info := range commands {
+			fmt.Printf("%*s    %s\n", -longest_command_length, command, info.description)
+		}
+	}
+	if len(os.Args) <= 1 {
+		print_help()
+		return
+	} else {
+		command := os.Args[1]
+		info, is_valid_command := commands[command]
+		if !is_valid_command {
+			fmt.Printf("invalid command: %s\n", command)
 			print_help()
-			os.Exit(0)
-		} else {
-			command := os.Args[1]
-			info, is_valid_command := commands[command]
-			if !is_valid_command {
-				fmt.Printf("invalid command: %s\n", command)
-				print_help()
-				os.Exit(1)
-			}
-			info.action()
+			return
 		}
-	}()
+		info.action()
+	}
 }
 
 
@@ -533,6 +444,17 @@ func mismatched_dotfiles(logger *Logger) (mismatched_files map[string]struct{}) 
 	assert(dir_exists(big_bang_dotfiles))
 	logger.Info().Begin("finding mismatches")
 	defer logger.Info().Done("finding mismatches")
+
+
+	var filepath_relative_child = func(base, target string) string {
+		// filepath.Rel doesn't require target to be a child of base but for this script, that will never be the case.
+		assert(strings.HasPrefix(target, base))
+		assert(filepath.IsAbs(target))
+		assert(filepath.IsAbs(base))
+		rel, err := filepath.Rel(base, target)
+		assert_location(err == nil, "", 1)
+		return rel
+	}
 
 
 	var swap_base_dir = func(old_target, old_base, new_base string) (new_target string) {
@@ -934,10 +856,6 @@ https://patorjk.com/software/taag/#p=display&v=0&f=ANSI%20Shadow&t=logger
 ███████╗╚██████╔╝╚██████╔╝╚██████╔╝███████╗██║  ██║
 
 
-*/
-
-
-/*
 This is a performant, zero-allocation, minimal (~400 LoC) logger heavily inspired by ZeroLog. As of August 15, 2025, Zerolog has ~16,000 LoC.
 It serves two main purposes:
 1. Eliminate external logger dependencies by emulating only the core API to maximize portability.
@@ -950,27 +868,26 @@ Design Decisions:
 
 1. No colored output
 	At first, I implemented the option to enable colored output at runtime. In practice however, the colors are not all that useful when the context gets
-	large and your terminal screen is filled with text that hard wrap--breaking visual alignment of the logs. It's better to save the logs in a file and
+	large and your terminal screen is filled with text that hard wrap——breaking visual alignment of the logs. It's better to save the logs in a file and
 	explore them in your editor without wrapping to enjoy the visual alignment.
-	Another benefit is that this greatly simplifies the API and the memory management strategy.
+	Another benefit is that this greatly simplifies the API and memory management strategy.
 2. logfmt Dialect
-	The format is split into the Header and Body. The header is a fixed width chunk, holding the aforementioned fields that are present in all logs. The
-	body is a variable-width chunk, holding dynamically appended fields. The header is split into sub-components, namely time, log level, and the message,
-	all separated by the Log_Component_Separator. The body consists of key=value pairs separated by Log_Component_Separator. By default, the
+	The format is split into the Header and Body. The header is a fixed-width chunk, holding the aforementioned fields that are present in all logs. The
+	body is a variable-width chunk, holding dynamically appended fields. The header is split into sub-components, namely (1) time, (2) log level, (3) and
+	the message, all separated by the Log_Component_Separator. The body consists of key=value pairs separated by Log_Component_Separator. By default, the
 	Log_Component_Separator is set to '|'. This greatly simplifies escaping as there now only 2 special characters in logs which is the '=' and the
 	Log_Component_Separator. No quoting, or escaping of spaces needed.
 
 
-	time|level|message|context
+	Format:
+		time|level|message|context
 
 
-	TODO: Consider adding filename:line to the header. (Be aware: runtime.Caller heap allocates.)
 	TODO: Add a Quoted() method where the user can specify the enclosing delimiters for the value, If '|' or '=' is a highly frequent character for their
 	log entry.
 */
 
 
-// TODO: use a multiwriter and always write the logs to a file
 var Log_Writer io.Writer = os.Stdout
 const (
 	// These defaults cover most cases. Note that these buffers can still grow when the need arises, in which case, they don't get returned to the
@@ -1007,7 +924,6 @@ func New_Logger(level int) *Logger {
 }
 
 
-// TODO: func (logger *Logger) Assert(cond bool) *Log Event { ... }
 func (logger *Logger) Debug() *Log_Event { if logger == nil || logger.Level > Log_Level_Debug { return nil } else { return init_log_event(logger, "DEBUG"+string(Log_Component_Separator)) } }
 func (logger *Logger) Info()  *Log_Event { if logger == nil || logger.Level > Log_Level_Info  { return nil } else { return init_log_event(logger, "INFO "+string(Log_Component_Separator)) } }
 func (logger *Logger) Warn()  *Log_Event { if logger == nil || logger.Level > Log_Level_Warn  { return nil } else { return init_log_event(logger, "WARN "+string(Log_Component_Separator)) } }
@@ -1156,7 +1072,7 @@ func (event *Log_Event) Message(msg string) *Log_Event {
 	}
 	start := Log_Time_Capacity + len(" ") + Log_Level_Capacity + len(" ")
 	end   := start + Log_Message_Capacity
-	assert(end - start < len(event.Buffer), "length shouild've been unsafely set past the empty message sub buffer during the log event initialization")
+	assert(end - start < len(event.Buffer), "length should've been unsafely set past the empty message sub buffer during the log event initialization")
 	message_buffer := event.Buffer[start:end]
 	if len(msg) <= Log_Message_Capacity { 
 		for offset := range msg {
@@ -1242,8 +1158,7 @@ func init_log_event(logger *Logger, log_level_str string) *Log_Event {
 	event.Buffer = append(event.Buffer, 'Z', Log_Component_Separator)
 
 
-	longest_log_level_word := "DEBUG"
-	assert(len(log_level_str) == len(longest_log_level_word+string(Log_Component_Separator)))
+	assert(len(log_level_str) == Log_Level_Word_Max_Length + len("|"))
 	assert(strings.HasSuffix(log_level_str, string(Log_Component_Separator)))
 	event.Buffer = append(event.Buffer, string_to_bytes(log_level_str)...)
 
@@ -1397,29 +1312,6 @@ func dir_exists(path string) bool {
 func file_exists(path string) bool {
 	info, err := os.Lstat(path)
 	return err == nil && !info.IsDir()
-}
-
-
-// inspired by tar flag
-// returned string will never end in a slash so you can't be sure it's a directory
-func strip_leading_component(path string, n int) string {
-	if n < 0 {
-		n = 0
-	}
-	assert_location(filepath.IsAbs(path), "", 1)
-	path = filepath.Clean(path)
-	return strings.Join(strings.Split(path, string(filepath.Separator))[n:], string(filepath.Separator))
-}
-
-
-func filepath_relative_child(base, target string) string {
-	// filepath.Rel doesn't require target to be a child of base but for this script, that will never be the case.
-	assert(strings.HasPrefix(target, base))
-	assert(filepath.IsAbs(target))
-	assert(filepath.IsAbs(base))
-	rel, err := filepath.Rel(base, target)
-	assert_location(err == nil, "", 1)
-	return rel
 }
 
 
