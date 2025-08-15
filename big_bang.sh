@@ -208,7 +208,7 @@ install_golang() {
         print "downloading go"
         download_location="$BIG_BANG_TMP/$go_release"
         download_url="https://go.dev/dl/$go_release"
-        if ! curl --fail --show-error --location --retry 10 --output "$download_location" -- "$download_url"; then
+        if ! curl --proto '=https' --fail --show-error --location --retry 10 --output "$download_location" -- "$download_url"; then
                 print "failed to download go binary: $download_url"
                 return 1
         fi
@@ -277,6 +277,14 @@ install_cargo() {
         return curl --proto '=https' --tlsv1.2 --silent --show-error --fail https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain=stable
 }
 
+install_nix() {
+        if command -v nix >/dev/null; then
+                print "nix is already installed"
+                return 0
+        fi
+        return curl --proto '=https' --tlsv1.2 --silent --show-error --fail --location https://install.determinate.systems/nix | sh -s -- install
+}
+
 system_preferences() {
           if [ "$operating_system" != "Darwin" ]; then
                     return 0
@@ -335,12 +343,11 @@ main() {
         install_golang       || { print "error installing go";              exit 1; }
         install_homebrew     || { print "error installing homebrew";        exit 1; }
         install_cargo        || { print "error installing homebrew";        exit 1; }
+        install_nix          || { print "error installing nix";             exit 1; }
         setup_ssh            || { print "error during ssh setup";           exit 1; }
         system_preferences   || { print "error setting system preferences"; exit 1; }
         go run ./big_bang.go || { print "error running go script";          exit 1; }
-
         exit 0
 }
-
 
 main
