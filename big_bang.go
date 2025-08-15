@@ -935,6 +935,41 @@ https://patorjk.com/software/taag/#p=display&v=0&f=ANSI%20Shadow&t=logger
 
 
 */
+
+
+/*
+This is a performant, zero-allocation, minimal (~400 LoC) logger heavily inspired by ZeroLog. As of August 15, 2025, Zerolog has ~16,000 LoC.
+It serves two main purposes:
+1. Eliminate external logger dependencies by emulating only the core API to maximize portability.
+2. Support only one log format. I personally prefer logfmt over JSON. In this case, I implemented a custom dialect of logfmt where the most useful information
+are prepended to the logs for quick debugging.
+
+
+Design Decisions:
+
+
+1. No colored output
+	At first, I implemented the option to enable colored output at runtime. In practice however, the colors are not all that useful when the context gets
+	large and your terminal screen is filled with text that hard wrap--breaking visual alignment of the logs. It's better to save the logs in a file and
+	explore them in your editor without wrapping to enjoy the visual alignment.
+	Another benefit is that this greatly simplifies the API and the memory management strategy.
+2. logfmt Dialect
+	The format is split into the Header and Body. The header is a fixed width chunk, holding the aforementioned fields that are present in all logs. The
+	body is a variable-width chunk, holding dynamically appended fields. The header is split into sub-components, namely time, log level, and the message,
+	all separated by the Log_Component_Separator. The body consists of key=value pairs separated by Log_Component_Separator. By default, the
+	Log_Component_Separator is set to '|'. This greatly simplifies escaping as there now only 2 special characters in logs which is the '=' and the
+	Log_Component_Separator. No quoting, or escaping of spaces needed.
+
+
+	time|level|message|context
+
+
+	TODO: Consider adding filename:line to the header. (Be aware: runtime.Caller heap allocates.)
+	TODO: Add a Quoted() method where the user can specify the enclosing delimiters for the value, If '|' or '=' is a highly frequent character for their
+	log entry.
+*/
+
+
 // TODO: use a multiwriter and always write the logs to a file
 var Log_Writer io.Writer = os.Stdout
 const (
@@ -959,8 +994,6 @@ const (
 	Log_Level_Disabled =  50
 
 
-	// TODO: implement. This allows only needing to escape the log separator instead of currently space and double quotes. It also is stricter on the
-	// separation of components. But this comes at the cost of readability.
 	Log_Component_Separator = '|'
 )
 func New_Logger(level int) *Logger {
@@ -978,7 +1011,8 @@ func New_Logger(level int) *Logger {
 func (logger *Logger) Debug() *Log_Event { if logger == nil || logger.Level > Log_Level_Debug { return nil } else { return init_log_event(logger, "DEBUG"+string(Log_Component_Separator)) } }
 func (logger *Logger) Info()  *Log_Event { if logger == nil || logger.Level > Log_Level_Info  { return nil } else { return init_log_event(logger, "INFO "+string(Log_Component_Separator)) } }
 func (logger *Logger) Warn()  *Log_Event { if logger == nil || logger.Level > Log_Level_Warn  { return nil } else { return init_log_event(logger, "WARN "+string(Log_Component_Separator)) } }
-// The errs parameter is merely for convenience.
+// The errs parameter is merely for convenience. One benefit of it also is that the error is ensured to be the first key value pair in the context unless the
+// parent logger already holds context to be inherited.
 func (logger *Logger) Error(errs ...error) *Log_Event { 
 	if logger == nil || logger.Level > Log_Level_Error { return nil } 
 	event := init_log_event(logger, "ERROR ") 
@@ -1018,14 +1052,23 @@ func (logger *Logger) With_Data(key string, val string) *Logger {
 }
 
 
-func (event *Log_Event) Msg(message string) { 
-	if event == nil { 
-		return 
-	}
-	event.Message(message).Send() 
-}
+func (event *Log_Event) Msg  (msg string) { if event == nil { return }; event.Message(msg).Send() }
+// Simply convenience functions to help guide your message. With these prefixes, you'd want to start with verbs in the present-progressive form.
+// I recommend not using these like tracing logs. Only call Done() if an operation completes successfully. Otherwise, you probably have some WARN/ERROR log
+// outputted right beforehand, making it redundant. (And if something failed without any logs, you know what to do)
+func (event *Log_Event) Begin(msg string) { if event == nil { return }; event.Msg("begin "+msg) }
+func (event *Log_Event) Done (msg string) { if event == nil { return }; event.Msg("done  "+msg) }
+
+
 // func (event *Log_Event) Bytes (key string, val string) *Log_Event { if event == nil { return nil }; return event.Data_Quoted(key, val) }
-func (event *Log_Event) Str (key string, val string) *Log_Event { if event == nil { return nil }; return event.Data(key, val) }
+func (event *Log_Event) Str (key string, val string) *Log_Event { 
+	if event == nil { 
+		return nil 
+	}
+	return event.Data(key, val) 
+}
+
+
 func (event *Log_Event) Err (err error ) *Log_Event { 
 	if event == nil { 
 		return nil 
@@ -1036,24 +1079,24 @@ func (event *Log_Event) Err (err error ) *Log_Event {
 	} 
 	return event.Data("error", err_str) 
 }
-// TODO: Do a list here
+
+
 func (event *Log_Event) Errs(vals ...error) *Log_Event { 
 	if event == nil || len(vals) == 0  { return nil }
-	first_error := true
 	for _, v := range vals {
-		if v == nil {
-			continue
-		}
-		if first_error {
-			event.Buffer = append(event.Buffer, string_to_bytes("errors")...)
-			event.Buffer = append(event.Buffer, '=', '[')
-		}
-		first_error = false
-		event.Buffer = append(event.Buffer, ' ', '"')
-		append_and_escape(&event.Buffer, v.Error())
-		event.Buffer = append(event.Buffer, '"', ' ')
+		event = event.Data("error", v.Error())
 	}
-	event.Buffer = append(event.Buffer, ' ', ']', Log_Component_Separator)
+	return event
+}
+
+
+func (event *Log_Event) List(key string, vals ...string) *Log_Event {
+	if event == nil {
+		return nil
+	}
+	for _, val := range vals {
+		event = event.Data(key, val)
+	}
 	return event
 }
 
@@ -1097,19 +1140,6 @@ func (event *Log_Event) Bool(key string, cond bool) *Log_Event {
 	}
 	return event.Data(key, val)
 }
-func (event *Log_Event) List(key string, vals ...string) *Log_Event {
-	if event == nil {
-		return nil
-	}
-	append_and_escape(&event.Buffer, key)
-	event.Buffer = append(event.Buffer, '=', '[')
-	for _, v := range vals {
-		event.Buffer = append(event.Buffer, ' ')
-		event.Buffer = append(event.Buffer, string_to_bytes(v)...)
-	}
-	event.Buffer = append(event.Buffer, ' ', ']', Log_Component_Separator)
-	return event
-}
 func (event *Log_Event) Data(key, val string) *Log_Event {
 	if event == nil {
 		return nil
@@ -1120,8 +1150,6 @@ func (event *Log_Event) Data(key, val string) *Log_Event {
 	event.Buffer = append(event.Buffer, Log_Component_Separator)
 	return event
 }
-func (event *Log_Event) Begin(msg string) { if event == nil { return }; event.Msg("begin "+msg) }
-func (event *Log_Event) Done (msg string) { if event == nil { return }; event.Msg("done  "+msg) }
 func (event *Log_Event) Message(msg string) *Log_Event {
 	if event == nil {
 		return nil
@@ -1180,18 +1208,6 @@ func (event *Log_Event) Send() {
 		}
 		return true
 	}(), "final log event does not contain null bytes")
-}
-
-
-func (event *Log_Event) Message_Sub_Buffer() []byte {
-	if event == nil {
-		return nil
-	}
-	start := Log_Time_Capacity + len("|") + Log_Level_Capacity + len("|")
-	end   := start + Log_Message_Capacity
-	assert(end - start == Log_Message_Capacity)
-	assert(end + start < Log_Default_Buffer_Capacity)
-	return event.Buffer[start:end]
 }
 
 
@@ -1258,18 +1274,21 @@ func deinit_log_event(event *Log_Event) {
 }
 
 
+// Logger is a long-lived object that primarily holds context data to be inherited by all of its child Log_Events.
+// All of Logger's methods that append to the context buffer create a new copy of Logger.
 type Logger struct {
 	// To be inherited by a Log_Event created by its methods.
 	Buffer     []byte
 	Level      int
 }
-// A transient object that should not be touched after writing to stdout. Minimize scope as much as possible, usually in one statement. If you're passing this
-// as a function parameter, embed that context in the Logger instead.
+// Log_Event is a transient object that should not be touched after writing to Log_Writer. Minimize scope as much as possible, usually in one statement. 
+// If you find yourself passing this as a function parameter, embed that context in the Logger instead. 
+// Log_Event methods modify the Log_Event itself through a pointer receiver.
 type  Log_Event struct {
 	Buffer []byte
-	// Doesn't need to hold log level. Logger.<Method>() *Log_Event {...} returns a nil event if a message shouldn't be logged. This nil check will be a
-	// no-op that permeates through the rest of the method chain e.g. logger.Info().Str("key", "value").Msg("foo bar baz").
-	// Level  int
+	// The log level is intentionally omitted from Log_Event.
+	// Logger.<Level>() methods return nil if the event should not be logged, allowing method chains like logger.Info().Str("key", "val").Msg("msg") to
+	// no-op safely. This design eliminates the need to check the log level inside Log_Event itself.
 }
 var Log_Event_Pool = &sync.Pool{
 	New: func() any { 
