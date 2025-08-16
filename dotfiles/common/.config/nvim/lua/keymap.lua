@@ -21,9 +21,9 @@ override       ({ "i", "c"      }, "<C-BS>",    "<C-W>",     "Kill word before c
 vim.keymap.set ({ "n", "v", "o" }, "<Home>",    "^zH",       { desc = "Jump to first char of current line and screen hug left" })
 vim.keymap.set ({ "i"           }, "<Home>",    "<ESC>^zHi", { desc = "Jump to first char of current line and screen hug left" })
 
--------- IMPROVED FUNCTIONALITY --------
+vim.keymap.set({"n", "i"}, "<C-S>",   "<ESC>:w<CR>", { desc = "Save File" })
 
-vim.keymap.set("n", "q:", ":q", { desc = "use q? instead" })
+-------- IMPROVED FUNCTIONALITY --------
 
 vim.keymap.set("n", "H", "<nop>")
 
