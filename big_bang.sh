@@ -22,6 +22,7 @@
 # DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
 # OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 # NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 noop() {
 	:
 }
@@ -88,6 +89,7 @@ EOF
 
                 tmp_zprofile="$(mktemp)"
                 cat > "$tmp_zprofile" <<'EOF'
+export PATH="$HOME/.local/bin:$PATH"
 if brew --version > /dev/null; then
         eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
@@ -101,9 +103,12 @@ export PATH="$CARGO_HOME/bin:$PATH"
 export PATH="$BIG_BANG_BIN:$PATH"
 
 export MANPATH="$BIG_BANG_MAN:$MANPATH"
-
+EOF
+                tmp_zshrc="$(mktemp)"
+                cat > "$tmp_zshrc" <<'EOF'
+# Execute fish in zshrc because it seems that the nix installer only adds nix to PATH after $HOME/.zprofile is sourced.
 if command -v fish >/dev/null && test "$EXIT_OUT_OF_FISH" = ""; then
-        fish
+        exec fish
 fi
 EOF
                 if ! cmp -z --quiet "$HOME/.zshenv" "$tmp_zshenv"; then
@@ -116,7 +121,14 @@ EOF
                         print "updating .zprofile"
                         cat "$tmp_zprofile" > "$HOME/.zprofile"
                         print "Sourcing .zprofile"
-                        EXIT_OUT_OF_FISH=1 . "$HOME/.zprofile" || { print 'failed to source .zprofile'; exit 1; }
+                        . "$HOME/.zprofile" || { print 'failed to source .zprofile'; exit 1; }
+                fi
+
+                if ! cmp -z --quiet "$HOME/.zshrc" "$tmp_zshrc"; then
+                        print "updating .zshrc"
+                        cat "$tmp_zshrc" > "$HOME/.zshrc"
+                        print "Sourcing .zshrc"
+                        EXIT_OUT_OF_FISH=1 . "$HOME/.zshrc" || { print 'failed to source .zshrc'; exit 1; }
                 fi
                 ;;
         'Linux')
@@ -282,7 +294,8 @@ install_nix() {
                 print "nix is already installed"
                 return 0
         fi
-        return curl --proto '=https' --tlsv1.2 --silent --show-error --fail --location https://install.determinate.systems/nix | sh -s -- install
+        curl --proto '=https' --tlsv1.2 --silent --show-error --fail --location https://install.determinate.systems/nix | sh -s -- install
+        return $?
 }
 
 system_preferences() {
