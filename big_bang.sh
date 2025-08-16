@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env dash
 
 # Copyright 2025 Danzig James Orcales
 # 
