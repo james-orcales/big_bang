@@ -1,0 +1,157 @@
+{
+	description = "nix config ni pogi";
+
+	inputs = {
+		nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-25.05-darwin";
+		nix-darwin.url = "github:nix-darwin/nix-darwin/nix-darwin-25.05";
+		nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
+	};
+
+	outputs = inputs@{ self, nix-darwin, nixpkgs } : let
+		hostname = "macnipogi";
+		username = "james-orcales"
+		applications = { pkgs, ...} : {
+			environment.systemPackages = [
+				pkgs.fishMinimal
+				pkgs.neovim
+				pkgs.tmux
+
+				# cli tools
+				pkgs.git
+				pkgs.fd
+				pkgs.fzf
+				pkgs.hyperfine
+				pkgs.lazygit
+				pkgs.ripgrep
+			];
+			# 1) Homebrew is a rolling-release package-manager. Applications that we want to be up-to-date
+			#    or version-pinning is low-priority should be installed with this. 
+			# 2) On MacOS, GUI applications are always installed with homebrew casks.
+			homebrew = {
+				enable = true;
+				global.autoUpdate = false;
+				onActivation = {
+					cleanup = "zap";
+					extraFlags = [
+						"--verbose"
+					];
+					casks = [
+						firefox
+						microsoft-edge
+						ghostty
+						veracrypt
+						obs
+					];
+				};
+			}
+		}
+		system_settings = { pkgs, ...}: {
+			system.defaults = {
+				NSGlobalDomain = {
+					# Add a context menu item for showing the Web Inspector in web views
+					WebKitDeveloperExtras = true;
+					AppleShowScrollBars = "always";
+					NSAutomaticCapitalizationEnabled   = false;
+					NSAutomaticDashSubstitutionEnabled = false;
+					NSAutomaticInlinePredictionEnabled = false;
+					NSAutomaticPeriodSubstitutionEnabled = false;
+					NSAutomaticQuoteSubstitutionEnabled = false;
+					NSAutomaticSpellingCorrectionEnabled = false;
+				};
+				finder = {
+					AppleShowAllExtensions  = true;
+					AppleShowAllFiles       = true;
+					AppleShowScrollBars     = true;
+					FXPreferredViewStyle = "Nlsv"; # list view
+					NewWindowTarget     = "Home";
+					ShowPathBar = true;
+					ShowStatusBar = true;
+					_FXShowPosixPathInTitle = true;
+				};
+				dock = {
+					appswitcher-all-displays = true;
+					autohide = false;
+					autohide-delay = 0;
+					autohide-time-modifier = 0.25;
+					magnification = true;
+					minimize-to-application = true;
+					orientation = "left";
+					show-recents = false;
+					persistent-apps = [
+						{ app = "Applications/Ghostty.app"; }
+						# { app = "Applications/Microfost-Edge.app"; }
+						# { app = "Applications/Firefox.app"; }
+						# { app = "Applications/OBS.app"; }
+					];
+					persistent-others = [
+						"~/Downloads"
+					];
+				};
+			};
+			menuExtraClock.Show24Hour = true;
+			CustomSystemPreferences = {};
+			# defaults domains
+			# defaults read <domain>
+			CustomUserPreferences = {
+				# Nix Darwin Quick Tip: Activate Your Preferences by Patrick Walsh titled (April 28, 2023)
+				# https://medium.com/@zmre/nix-darwin-quick-tip-activate-your-preferences-f69942a93236
+				"com.apple.finder" = {
+					_FXSortFoldersFirst = true;
+					# When performing a search, search the current folder by default
+					FXDefaultSearchScope = "SCcf";
+				};
+				"com.apple.screensaver" = {
+					# Require password immediately after sleep or screen saver begins
+					askForPassword = 1;
+					askForPasswordDelay = 0;
+				};
+				"com.apple.AdLib" = {
+					allowApplePersonalizedAdvertising = false;
+				};
+				"com.apple.desktopservices" = {
+					# Avoid creating .DS_Store files on network or USB volumes
+					DSDontWriteNetworkStores = true;
+					DSDontWriteUSBStores = true;
+				};
+				"com.apple.SoftwareUpdate" = {
+					AutomaticCheckEnabled = true;
+					# Check for software updates daily, not just once per week
+					ScheduleFrequency = 1;
+					AutomaticDownload = 0;
+					CriticalUpdateInstall = 1;
+				};
+			};
+		};	
+		configuration = { pkgs, ... }: {
+			# List packages installed in system profile. To search by name, run:
+			# $ nix-env -qaP | grep wget
+			environment.systemPackages = [ git ];
+
+			environment.variables = {
+				EDITOR = "nvim";
+			}
+
+			# Necessary for using flakes on this system.
+			nix.settings.experimental-features = "nix-command flakes";
+
+			# Set Git commit hash for darwin-version.
+			system.configurationRevision = self.rev or self.dirtyRev or null;
+
+			# Used for backwards compatibility, please read the changelog before changing.
+			# $ darwin-rebuild changelog
+			system.stateVersion = 6;
+
+			# The platform the configuration will be used on.
+			nixpkgs.hostPlatform = "aarch64-darwin";
+		}; 
+		in {
+			# Build darwin flake using:
+			# $ darwin-rebuild build --flake .#<USERNAME>
+			darwinConfigurations."${hostname}" = nix-darwin.lib.darwinSystem {
+				modules = [ 
+					applications
+					configuration
+				];
+			};
+		};
+}
