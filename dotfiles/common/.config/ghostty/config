@@ -4,3 +4,8 @@ font-size           = 15
 window-height       = 9999
 window-width        = 9999
 macos-option-as-alt = true
+
+keybind = ctrl+left=esc:b
+keybind = ctrl+right=esc:f
+keybind = super+ctrl+alt+shift+n=next_tab
+keybind = super+ctrl+alt+shift+p=previous_tab
