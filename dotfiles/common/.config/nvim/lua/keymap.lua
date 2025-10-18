@@ -9,19 +9,24 @@ local override = function(modes, new, default, desc, custom_behavior)
 	vim.keymap.set(modes, new, behavior, { desc = desc })
 end
 
-override       ({ "n", "v", "o" }, "<C-Left>",  "b",         "Jump previous word")
-override       ({ "n", "v", "o" }, "<S-Left>",  "B",         "Jump previous whitespace")
-override       ({ "n", "v", "o" }, "<C-Right>", "w",         "Jump next word")
-override       ({ "n", "v", "o" }, "<S-Right>", "W",         "Jump next whitespace")
-override       ({ "n", "v", "o" }, "<C-Home>",  "gg",        "Jump first line")
-override       ({ "n", "v", "o" }, "<C-End>",   "G",         "Jump last line")
-override       ({ "i", "c"      }, "<C-H>",     "<C-W>",     "Kill word before cursor")
-override       ({ "i", "c"      }, "<C-BS>",    "<C-W>",     "Kill word before cursor")
+override({ "n", "v", "o" }, "<C-Left>",  "b",     "Jump previous word")
+override({ "n", "v", "o" }, "<S-Left>",  "B",     "Jump previous whitespace")
+override({ "n", "v", "o" }, "<C-Right>", "w",     "Jump next word")
+override({ "n", "v", "o" }, "<S-Right>", "W",     "Jump next whitespace")
+override({ "n", "v", "o" }, "<C-Home>",  "gg",    "Jump first line")
+override({ "n", "v", "o" }, "<C-End>",   "G",     "Jump last line")
+override({ "i", "c"      }, "<C-H>",     "<C-W>", "Kill word before cursor")
+override({ "i", "c"      }, "<C-BS>",    "<C-W>", "Kill word before cursor")
+override({ "i", "c"      }, "<M-BS>",    "<C-W>", "Kill word before cursor") -- MacOS-specific
 
 vim.keymap.set ({ "n", "v", "o" }, "<Home>",    "^zH",       { desc = "Jump to first char of current line and screen hug left" })
 vim.keymap.set ({ "i"           }, "<Home>",    "<ESC>^zHi", { desc = "Jump to first char of current line and screen hug left" })
 
 vim.keymap.set({"n", "i"}, "<C-S>",   "<ESC>:w<CR>", { desc = "Save File" })
+
+-- Typos
+vim.keymap.set("i", "!+",   "!=")
+vim.keymap.set("i", ":+",   ":=")
 
 -------- IMPROVED FUNCTIONALITY --------
 
@@ -49,9 +54,13 @@ vim.keymap.set("i", "<C-c>", "<Esc>")
 
 -------- NEW FUNCTIONALITY --------
 
+-- Quickfix
+vim.keymap.set("n", "{", "<CMD>:cprevious<CR>")
+vim.keymap.set("n", "}", "<CMD>:cnext<CR>")
+
 -- Move selection in visual mode
-vim.keymap.set("v", "<C-Down>", ":m '>+1<CR>gv=gv")
-vim.keymap.set("v", "<C-Up>", ":m '<-2<CR>gv=gv")
+vim.keymap.set("v", "<A-Down>", ":m '>+1<CR>gv=gv")
+vim.keymap.set("v", "<A-Up>", ":m '<-2<CR>gv=gv")
 
 -- Delete without affecting default register
 vim.keymap.set("v", "D", [["_d]])

@@ -66,11 +66,113 @@ require("lazy").setup({
                                                 }
                                         },
                                 })
-                                vim.keymap.set("n", "<Space>", fzf.files)
+                                
+                                local function module_api_search()
+                                        programming_language = nil
+                                        local handle = vim.uv.fs_scandir(vim.uv.cwd())
+                                        if handle then
+                                                while true do
+                                                        local name, t = vim.uv.fs_scandir_next(handle)
+                                                        if name == nil then 
+                                                                break 
+                                                        end
+                                                        if t == "file" then
+                                                                if name:match("%.go$") then
+                                                                        programming_language = "Golang"
+                                                                        break
+                                                                end
+                                                                if name:match("%.odin$") then
+                                                                        programming_language = "Odin"
+                                                                        break
+                                                                end
+                                                        end
+                                                end
+                                        end
+                                        fzf.live_grep()
+                                        if programming_language == nil then
+                                                fzf.live_grep()
+                                                return
+                                        end
+
+                                        local items = nil
+                                        if programming_language == "Golang" then
+                                                items = { "Function", "Type", "Variables", "_Function", "_Type"}
+                                        elseif programming_language == "Odin" then
+                                                items = { "Procedure", "Type", "Variables", "_Procedure", "_Type"}
+                                        end
+                                        assert(items ~= nil)
+                                        table.insert(items, "Any")
+                                        fzf.fzf_exec(
+                                                items,
+                                                {
+                                                        prompt = string.format("Search Package (%s) > ", programming_language), 
+                                                        actions = {
+                                                                ["default"] = function(selected, opts)
+                                                                        if selected == nil then
+                                                                                return
+                                                                        end
+                                                                        selected = selected[1]
+                                                                        if selected == "Any" then
+                                                                                fzf.live_grep()
+                                                                                return
+                                                                        end
+                                                                        assert(programming_language ~= nil)
+                                                                        local pattern = nil
+                                                                        local rg_opts = nil
+                                                                        if programming_language == "Golang" then
+                                                                                if selected == "Function" then
+                                                                                        local func       = [[^func +]]
+                                                                                        local receiver   = [[(?:\(\w+ +\*?\w+\))? *]] -- optional
+                                                                                        local identifier = [[[A-Z]\w+]]
+                                                                                        local generics   = [[(?:\[.*?\])?]]
+                                                                                        local signature  = [[\(.*?\) +]]
+                                                                                        pattern = func .. receiver .. identifier .. generics .. signature
+                                                                                elseif selected == "Type" then
+                                                                                        pattern = [[^type +[A-Z]\w* +]]
+                                                                                elseif selected == "Variables" then
+                                                                                        rg_opts = "--multiline"
+                                                                                        -- only matches file scope
+                                                                                        local single_line = [[^(?:var|const) +[A-Z]\w+]]
+                                                                                        local multiline = [[(?s)^(?:var|const) \(.*?^\)]]
+                                                                                        pattern = string.format("(?:%s|%s)", single_line, multiline)
+                                                                                elseif selected == "_Function" then
+                                                                                        pattern = [[^func +.*]] 
+                                                                                elseif selected == "_Type" then
+                                                                                        pattern = [[^type +\w+ +]]
+                                                                                end
+                                                                                pattern = pattern .. " -- !*test*"
+                                                                        elseif programming_language == "Odin" then
+                                                                                if selected == "Procedure"  then
+                                                                                        pattern = [[^\w+ +:: +proc]]
+                                                                                elseif selected == "Type" then
+                                                                                        pattern = [[^\w+ +:: +(?:struct|union|enum|distinct)]]
+                                                                                end
+                                                                                pattern = pattern .. " -- !*test*"
+                                                                        end
+                                                                        fzf.live_grep({ 
+                                                                                search = pattern, 
+                                                                                rg_opts = rg_opts,
+                                                                                no_esc = true, 
+                                                                                -- Error: unable to init vim.regex
+                                                                                -- https://github.com/ibhagwan/fzf-lua/issues/1858#issuecomment-2689899556
+                                                                                -- The message is mostly informational, this happens due to the
+                                                                                -- previewer trying to convert the regex to vim magic pattern (in
+                                                                                -- order to highlight it), but not all cases can be covered so the
+                                                                                -- previewer will highlight the cursor column only (instead of the
+                                                                                -- entire pattern).
+                                                                                silent = true,
+                                                                        })
+                                                                end,
+                                                        },
+                                                }
+                                        )
+                                end
+                                vim.keymap.set("n", "<Space>",   fzf.files)
                                 vim.keymap.set("n", "<C-Space>", fzf.builtin)
-                                vim.keymap.set("n", "s<Space>",  fzf.live_grep)
-                                vim.keymap.set("n", "h<Space>", function() fzf.help_tags ({ previewer = false }) end )
-                                vim.keymap.set("n", "m<Space>", function() fzf.manpages  ({ previewer = false }) end )
+                                vim.keymap.set("n", "s<Space>",  module_api_search)
+                                vim.keymap.set("n", "h<Space>",  function() fzf.help_tags ({ previewer = false }) end )
+                                vim.keymap.set("n", "m<Space>",  function() fzf.manpages  ({ previewer = false }) end )
+
                         end,
                 },
                 {
