@@ -58,18 +58,18 @@ var (
 		}
 		return path
 	}()
-	BIG_BANG_GIT_ROOT    = filepath.Clean(os.Getenv("BIG_BANG_GIT_ROOT"))
-	BIG_BANG_ROOT        = filepath.Clean(os.Getenv("BIG_BANG_ROOT"))
-	BIG_BANG_SHARE       = filepath.Clean(os.Getenv("BIG_BANG_SHARE"))
-	BIG_BANG_MAN         = filepath.Clean(os.Getenv("BIG_BANG_MAN"))
-	BIG_BANG_BIN         = filepath.Clean(os.Getenv("BIG_BANG_BIN"))
-	BIG_BANG_TMP         = filepath.Clean(os.Getenv("BIG_BANG_TMP"))
-	CARGO_HOME           = filepath.Clean(os.Getenv("CARGO_HOME"))
-	RUSTUP_HOME          = filepath.Clean(os.Getenv("RUSTUP_HOME"))
+	BIG_BANG_GIT_DIR  = filepath.Clean(os.Getenv("BIG_BANG_GIT_DIR"))
+	BIG_BANG_DATA_DIR = filepath.Clean(os.Getenv("BIG_BANG_DATA_DIR"))
+	BIG_BANG_SHARE    = filepath.Clean(os.Getenv("BIG_BANG_SHARE"))
+	BIG_BANG_MAN      = filepath.Clean(os.Getenv("BIG_BANG_MAN"))
+	BIG_BANG_BIN      = filepath.Clean(os.Getenv("BIG_BANG_BIN"))
+	BIG_BANG_TMP      = filepath.Clean(os.Getenv("BIG_BANG_TMP"))
+	CARGO_HOME        = filepath.Clean(os.Getenv("CARGO_HOME"))
+	RUSTUP_HOME       = filepath.Clean(os.Getenv("RUSTUP_HOME"))
 
 
 	// A mirror of the home directory but only hosts dotfiles.
-	big_bang_dotfiles             = filepath.Clean(filepath.Join(BIG_BANG_GIT_ROOT, "dotfiles"))
+	big_bang_dotfiles             = filepath.Clean(filepath.Join(BIG_BANG_GIT_DIR, "dotfiles"))
 	big_bang_dotfiles_common      = filepath.Join(big_bang_dotfiles, "common")
 	big_bang_dotfiles_os_specific = func() string {
 		switch runtime.GOOS {
@@ -95,7 +95,7 @@ func main() {
 			Name:    "fish",
 			Install: func(logger *Logger) {
 				if path := which("fish"); path != "" {
-					if strings.HasPrefix(path, BIG_BANG_ROOT) {
+					if strings.HasPrefix(path, BIG_BANG_DATA_DIR) {
 						version_check := exec.Command("fish", "--version")
 						expect        := "fish, version 4.0.2"
 						actual_raw, _     := version_check.Output()
@@ -164,8 +164,8 @@ func main() {
 			Install: func(logger *Logger) {
 				if path := which("tokei"); path != "" {
 					assert(filepath.IsAbs(path))
-					assert(filepath.IsAbs(BIG_BANG_ROOT))
-					if strings.HasPrefix(path, BIG_BANG_ROOT) {
+					assert(filepath.IsAbs(BIG_BANG_DATA_DIR))
+					if strings.HasPrefix(path, BIG_BANG_DATA_DIR) {
                                                 return
 					}
 				}
@@ -251,7 +251,7 @@ func main() {
 
 
 	var err_setup = func() error {
-		for _, dir := range []string{BIG_BANG_ROOT, BIG_BANG_TMP, BIG_BANG_SHARE, BIG_BANG_BIN} {
+		for _, dir := range []string{BIG_BANG_DATA_DIR, BIG_BANG_TMP, BIG_BANG_SHARE, BIG_BANG_BIN} {
 			assert(filepath.IsAbs(dir), "exported in $ZDOTDIR/.zprofile and sourced by big_bang.sh before calling this script")
 		}
 
@@ -259,8 +259,8 @@ func main() {
 		assert(dir_exists(big_bang_dotfiles),             "included in the big bang repo")
 		assert(dir_exists(big_bang_dotfiles_common),      "included in the big bang repo")
 		assert(dir_exists(big_bang_dotfiles_os_specific), "included in the big bang repo")
-		assert(dir_exists(BIG_BANG_GIT_ROOT),             "the repo is cloned into $HOME/code/big_bang")
-		assert(dir_exists(BIG_BANG_ROOT),                 "hosts BIG_BANG_SHARE")
+		assert(dir_exists(BIG_BANG_GIT_DIR),             "the repo is cloned into $HOME/code/big_bang")
+		assert(dir_exists(BIG_BANG_DATA_DIR),                 "hosts BIG_BANG_SHARE")
 		assert(dir_exists(BIG_BANG_SHARE),                "created by big_bang.sh hosting GOROOT and GOPATH")
 		assert(dir_exists(BIG_BANG_BIN),                  "created by big_bang.sh hosting go.exe")
 
@@ -274,7 +274,7 @@ func main() {
 			return err 
 		}
 		// Just a safety measure in case I mess up paths. I still use absolute paths for everything.
-		if err := os.Chdir(BIG_BANG_ROOT); err != nil { 
+		if err := os.Chdir(BIG_BANG_DATA_DIR); err != nil { 
 			return err 
 		}
 		return nil
@@ -346,7 +346,7 @@ func main() {
 			},
 		},
 		"dependencies_download": Info{
-			description: "dependencies of which the binary can be downloaded directly will be saved in BIG_BANG_ROOT/download",
+			description: "dependencies of which the binary can be downloaded directly will be saved in BIG_BANG_DATA_DIR/download",
 			action: func() {
 				total_ctx, total_cancel := context.WithTimeout(context.Background(), time.Minute * 15)
 				defer total_cancel()
@@ -361,7 +361,7 @@ func main() {
 						defer wg.Done()
 						individual_ctx, individual_cancel := context.WithTimeout(total_ctx, time.Minute * 3)
 						defer individual_cancel()
-						download_artifact(individual_ctx, artifact, filepath.Join(BIG_BANG_ROOT, "download"), logger)
+						download_artifact(individual_ctx, artifact, filepath.Join(BIG_BANG_DATA_DIR, "download"), logger)
 					}()
 				}
 			},
@@ -381,7 +381,7 @@ func main() {
 					assert(artifact.Download_Link != "", 
 						"artifacts without a custom install step means their binaries are downloaded directly",
 					)
-					if path := which(artifact.Name); strings.HasPrefix(path, BIG_BANG_ROOT) {
+					if path := which(artifact.Name); strings.HasPrefix(path, BIG_BANG_DATA_DIR) {
 						logger.Info().Str("artifact", artifact.Name).Msg("already installed")
 						continue
 					}
@@ -798,11 +798,11 @@ type Artifact struct {
 	Name              string
 	Download_Link     string
 	Checksum          string
-	// If false, deletes BIG_BANG_ROOT/<PROGRAM>/ after installation.
+	// If false, deletes BIG_BANG_DATA_DIR/<PROGRAM>/ after installation.
 	// Useful for self-contained executables with no other files unlike Golang with its stdlib or nvim with its runtime directories.
 	// Instead of symlinking the executable to BIG_BANG_BIN, it gets moved there instead.
 	Retain_Installation_Dir bool
-	// By default, Artifact binary paths must have BIG_BANG_ROOT as a prefix. This is not the case for system-wide dependencies.
+	// By default, Artifact binary paths must have BIG_BANG_DATA_DIR as a prefix. This is not the case for system-wide dependencies.
 	System_Wide             bool
 	// As much as possible, download artifact binaries directly. If not possible, then specify the custom installation procedure here.
 	Install	func(*Logger)

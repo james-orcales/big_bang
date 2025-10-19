@@ -23,13 +23,12 @@
 
 
 assert(_VERSION == "Lua 5.1")
-JUST_GOT_SOURCED = arg[1]
 
 
 HOME = assert(os.getenv("XDG_CONFIG_HOME") or os.getenv("HOME"))
 HOME = HOME .. "/"
-BIG_BANG_GIT_ROOT = os.getenv("BIG_BANG_GIT_ROOT")
-BIG_BANG_ROOT     = os.getenv("BIG_BANG_ROOT")
+BIG_BANG_GIT_DIR  = os.getenv("BIG_BANG_GIT_DIR")
+BIG_BANG_DATA_DIR = os.getenv("BIG_BANG_DATA_DIR")
 BIG_BANG_SHARE    = os.getenv("BIG_BANG_SHARE")
 BIG_BANG_BIN      = os.getenv("BIG_BANG_BIN")
 BIG_BANG_MAN      = os.getenv("BIG_BANG_MAN")
@@ -71,10 +70,23 @@ function sh(...)
 end
 
 
-function INFO (fmt, ...) print(string.format("INFO |"..fmt, ...)) end
-function WARN (fmt, ...) print(string.format("WARN |"..fmt, ...)) end
-function ERROR(fmt, ...) print(string.format("ERROR|"..fmt, ...)) end
-function DEBUG(fmt, ...) print(string.format("DEBUG|"..fmt, ...)) end
+function source(filepath)
+        assert(type(filepath) == "string" and filepath ~= "")
+        INFO("sourcing %s", filepath)
+        NEW_ENVIRONMENT = {}
+        for k, v in sh("zsh -c env", "|"):gmatch("([%w_]+)=([^\n]+)") do
+                NEW_ENVIRONMENT[k] = v
+        end
+        function os.getenv(key)
+                return NEW_ENVIRONMENT[key]
+        end
+end
+
+
+function INFO (fmt, ...) print(string.format("%s|INFO |"..fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
+function WARN (fmt, ...) print(string.format("%s|WARN |"..fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
+function ERROR(fmt, ...) print(string.format("%s|ERROR|"..fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
+function DEBUG(fmt, ...) print(string.format("%s|DEBUG|"..fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
 
 
 function with_file(path, mode, fn, ...)
@@ -106,6 +118,7 @@ function read_file(path)
         local _, content = with_file(path, "r", function(handle)
                 return handle:read("*a")
         end)
+        assert(content == nil or type(content) == "string")
         return content
 end
 
@@ -119,8 +132,8 @@ function write_file(path, content)
 end
 
 
-function has_prefix(str, prefix)
-        assert(type(str) == "string")
+function string.has_prefix(str, prefix)
+        assert(type(str)    == "string")
         assert(type(prefix) == "string")
         return str:sub(1, #prefix) == prefix
 end
@@ -166,18 +179,20 @@ assert(
 -- === END OF PREREQUISITES ===
 
 
+-- "Why are you hardcoding this here? Isn't the whole point of this repo that you manage your dotfiles manually?"
+--      The shell config is essential to this bootstrapping so its better to keep its context inside this file.
 SHELL_CONFIG = {
         { 
                 path(HOME,".zshenv"), 
                 [[
-                export BIG_BANG_GIT_ROOT="$HOME/code/big_bang"
+                export BIG_BANG_GIT_DIR="$HOME/code/big_bang"
                 # A good reason not to use .local/share is to keep the PATH variable short. I want to avoid symlinks and hardcode all variables. A possible
                 # alternative is $HOME/big_bang, but that's a decision for later.
-                export BIG_BANG_ROOT="$HOME/.local/share/big_bang"
-                export BIG_BANG_SHARE="$BIG_BANG_ROOT/share"
-                export BIG_BANG_BIN="$BIG_BANG_ROOT/bin"
-                export BIG_BANG_MAN="$BIG_BANG_ROOT/man"
-                export BIG_BANG_TMP="$BIG_BANG_ROOT/tmp"
+                export BIG_BANG_DATA_DIR="$HOME/.local/share/big_bang"
+                export BIG_BANG_SHARE="$BIG_BANG_DATA_DIR/share"
+                export BIG_BANG_BIN="$BIG_BANG_DATA_DIR/bin"
+                export BIG_BANG_MAN="$BIG_BANG_DATA_DIR/man"
+                export BIG_BANG_TMP="$BIG_BANG_DATA_DIR/tmp"
 
 
                 export CARGO_HOME="$BIG_BANG_SHARE/rust/.cargo"
@@ -185,7 +200,7 @@ SHELL_CONFIG = {
 
 
                 export HOMEBREW_NO_AUTO_UPDATE=true
-                export HOMEBREW_BUNDLE_FILE="$BIG_BANG_ROOT/Brewfile"
+                export HOMEBREW_BUNDLE_FILE="$BIG_BANG_DATA_DIR/Brewfile"
                 export HOMEBREW_CASK_OPTS_REQUIRE_SHA=true
 
 
@@ -198,8 +213,6 @@ SHELL_CONFIG = {
                 --bind='home:first'                \
                 --bind='end:last'                  \
                 "
-
-
                 export EDITOR=nvim
                 ]]
         },
@@ -237,26 +250,6 @@ SHELL_CONFIG = {
 
 
 function env_setup()
-        -- TODO: CHANGE HIGHLIGHT COLOR WHEN SYSTEM CLIPBOARD YANK
-        local source = function(filepath)
-                assert(type(filepath) == "string" and filepath ~= "")
-                if JUST_GOT_SOURCED then
-                        return true
-                else
-                        JUST_GOT_SOURCED = false
-                        INFO("sourcing %s", filepath)
-                        local ok
-                        if operating_system == "Darwin" then
-                                ok = sh(string.format([[ zsh -c 'source %q; bin/lua %q your_mom' ]], filepath, arg[0]))
-                        else
-                                unimplemented()
-                        end
-                        if not ok then 
-                                ERROR("sourcing %s", filepath) 
-                        end
-                        os.exit(ok and 0 or 1)
-                end
-        end
         INFO("Environment setup")
         if operating_system == "Darwin" then
                 for _, config in ipairs(SHELL_CONFIG) do
@@ -272,28 +265,25 @@ function env_setup()
         elseif operating_system == "Linux" then
                 assert(false, "unsupported")
         end
-        assert(
-                sh([[ mkdir -p "$BIG_BANG_ROOT"  ]]) and
-                sh([[ mkdir -p "$BIG_BANG_SHARE" ]]) and
-                sh([[ mkdir -p "$BIG_BANG_BIN"   ]]) and
-                sh([[ mkdir -p "$BIG_BANG_TMP"   ]]) and
-                sh([[ mkdir -p "$BIG_BANG_MAN"   ]]),
-                "Essential directories are created"
-        )
+        assert(sh([[ mkdir -p "$BIG_BANG_DATA_DIR" ]]), "Essential directories are created")
+        assert(sh([[ mkdir -p "$BIG_BANG_SHARE"    ]]), "Essential directories are created")
+        assert(sh([[ mkdir -p "$BIG_BANG_BIN"      ]]), "Essential directories are created")
+        assert(sh([[ mkdir -p "$BIG_BANG_TMP"      ]]), "Essential directories are created")
+        assert(sh([[ mkdir -p "$BIG_BANG_MAN"      ]]), "Essential directories are created")
         return true
 end
 
 
 function install_golang()
-        assert(type(operating_system) == "string" and operating_system ~= "")
-        assert(type(cpu_architecture) == "string" and cpu_architecture ~= "")
-        assert(type(BIG_BANG_ROOT)    == "string" and BIG_BANG_ROOT    ~= "")
-        assert(type(BIG_BANG_SHARE)   == "string" and BIG_BANG_SHARE   ~= "")
-        assert(type(BIG_BANG_TMP)     == "string" and BIG_BANG_TMP     ~= "")
+        assert(type(operating_system)  == "string" and operating_system  ~= "")
+        assert(type(cpu_architecture)  == "string" and cpu_architecture  ~= "")
+        assert(type(BIG_BANG_DATA_DIR) == "string" and BIG_BANG_DATA_DIR ~= "")
+        assert(type(BIG_BANG_SHARE)    == "string" and BIG_BANG_SHARE    ~= "")
+        assert(type(BIG_BANG_TMP)      == "string" and BIG_BANG_TMP      ~= "")
 
 
         local version = "1.23.12"
-        if has_prefix(sh("command -v go", "|"), BIG_BANG_ROOT) then
+        if sh("command -v go", "|"):has_prefix(BIG_BANG_DATA_DIR) then
                 if sh("go version 2>/dev/null", "|"):match(version) then
                         INFO(string.format("golang v%s is already installed", version))
                         return true
@@ -335,7 +325,7 @@ function install_golang()
                 return false
         end
         assert(sh("go version", "|"):match(version))
-        if not sh([[go env -w GOPATH=%s]], path(BIG_BANG_ROOT, "/go-path")) then
+        if not sh([[go env -w GOPATH=%s]], path(BIG_BANG_DATA_DIR, "/go-path")) then
                 ERROR("updating GOPATH")
                 return false
         end
@@ -344,21 +334,21 @@ end
 
 
 function install_cargo()
-        assert(type(BIG_BANG_ROOT) == "string" and BIG_BANG_ROOT ~= "")
+        assert(type(BIG_BANG_DATA_DIR) == "string" and BIG_BANG_DATA_DIR ~= "")
         assert(type(CARGO_HOME)    == "string" and CARGO_HOME    ~= "")
         assert(type(RUSTUP_HOME)   == "string" and RUSTUP_HOME   ~= "")
-        if has_prefix(sh("command -v cargo",  "|"), BIG_BANG_ROOT)      and
-                has_prefix(sh("command -v rustup", "|"), BIG_BANG_ROOT) and
-                has_prefix(sh("command -v rustc",  "|"), BIG_BANG_ROOT) then
+        if sh("command -v cargo",  "|"):has_prefix(BIG_BANG_DATA_DIR) and
+                sh("command -v rustup", "|"):has_prefix(BIG_BANG_DATA_DIR) and
+                sh("command -v rustc",  "|"):has_prefix(BIG_BANG_DATA_DIR) then
                 INFO("cargo, rustup, and rustc are already installed")
                 return true
         else
-                if not has_prefix(CARGO_HOME, BIG_BANG_ROOT) then
-                        ERROR("CARGO_HOME is not within BIG_BANG_ROOT: got %s", CARGO_HOME)
+                if not CARGO_HOME:has_prefix(BIG_BANG_DATA_DIR) then
+                        ERROR("CARGO_HOME is not within BIG_BANG_DATA_DIR: got %s", CARGO_HOME)
                         return false
                 end
-                if not has_prefix(RUSTUP_HOME, BIG_BANG_ROOT) then
-                        ERROR("RUSTUP_HOME is not within BIG_BANG_ROOT: got %s", RUSTUP_HOME)
+                if not RUSTUP_HOME:has_prefix(BIG_BANG_DATA_DIR) then
+                        ERROR("RUSTUP_HOME is not within BIG_BANG_DATA_DIR: got %s", RUSTUP_HOME)
                         return false
                 end
                 INFO("installing cargo")
@@ -410,9 +400,6 @@ end
 -- https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent?platform=mac
 -- TODO: The repo was cloned with https if this script was executed for the very first time. Reassign the origin to the ssh url.
 function setup_ssh()
-        if JUST_GOT_SOURCED then
-                return true
-        end
         local config = [[
 Host github.com
   AddKeysToAgent yes
@@ -433,7 +420,7 @@ github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+V
                 write_file(path(HOME, ".ssh/known_hosts"), known_hosts)
         end
         if read_file(path(HOME, ".ssh/id_ed25519")) then
-                INFO("private key already exists")
+                INFO("Private key already exists")
                 return true
         else
                 INFO("Generating ssh key: id_ed25519")
@@ -442,7 +429,7 @@ github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+V
                         return false
                 end
                 -- TODO: Execute this to enable ssh keys in the current shell immediately.
-                -- We can print this then do eval "$(bin/lua bootstrap.lua)" but we'd have to ensure that nothing else is mixed in the output.
+                -- We can print then `eval "$(bin/lua bootstrap.lua)"` but we'd have to ensure that nothing else is mixed in with stdout.
                 -- eval "$(ssh-agent -s)" 
                 INFO("Execute this to enable the ssh agent in the current shell: %s", [[eval "$(ssh-agent -s)"]])
                 sh("ssh-add --apple-use-keychain $HOME/.ssh/id_ed25519")
@@ -460,9 +447,6 @@ end
 function system_preferences() 
         if operating_system ~= "Darwin" then
                 unimplemented()
-        end
-        if JUST_GOT_SOURCED then
-                return true
         end
         INFO("System preferences setup")
         local ok = sh([[
@@ -536,8 +520,9 @@ function main()
         install_homebrew()
         install_cargo()
         install_golang()
+        print([[=== go run big_bang.go dotfiles_sync ===]])
         sh("go run big_bang.go dotfiles_sync")
-        INFO("=== Bootstrap Finished ===")
+        print("=== Bootstrap Finished ===")
 end
 
 
