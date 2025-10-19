@@ -13,7 +13,7 @@ vim.api.nvim_set_hl(0, "NormalFloat", { bg = "#0A0A0A"            })
 vim.api.nvim_set_hl(0, "StatusLine",  { bg = "#111111"            })
 vim.api.nvim_set_hl(0, "StatusLine",  { bg = "#111111"            })
 vim.api.nvim_set_hl(0, "TODO",        { fg = palette["red"]       })
-vim.api.nvim_set_hl(0, "YankSystemClipboard", { bg = "#0000FF", fg = "#FFFFFF" })
+vim.api.nvim_set_hl(0, "YankSystemClipboard", { bg = "#0000FF", fg = "#000000" })
 
 
 vim.api.nvim_create_autocmd("TextYankPost", {
