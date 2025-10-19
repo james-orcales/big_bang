@@ -236,11 +236,11 @@ func main() {
 
 
 	prerequisites := map[string]string{
-		"git":    "clones the big bang repo hosting big_bang.sh, big_bang.go, and the dotfiles",
-		"sh":     "big_bang.sh: shell to execute",
-		"curl":   "big_bang.sh: downloads golang",
-		"sha256": "big_bang.sh: checksums golang",
-		"tar":    "big_bang.sh: unpacks go<version>.tar.gz. also unpacks .xz files because Go doesn't have it in the std lib",
+		"git":    "clones the big bang repo hosting bootstrap.lua, big_bang.go, and the dotfiles",
+		"sh":     "bootstrap.lua: shell to execute",
+		"curl":   "bootstrap.lua: downloads golang",
+		"sha256": "bootstrap.lua: checksums golang",
+		"tar":    "bootstrap.lua: unpacks go<version>.tar.gz. also unpacks .xz files because Go doesn't have it in the std lib",
 	}
 	for dependency := range prerequisites {
 		if path, _ := exec.LookPath(dependency); path != "" {
@@ -252,7 +252,7 @@ func main() {
 
 	var err_setup = func() error {
 		for _, dir := range []string{BIG_BANG_DATA_DIR, BIG_BANG_TMP, BIG_BANG_SHARE, BIG_BANG_BIN} {
-			assert(filepath.IsAbs(dir), "exported in $ZDOTDIR/.zprofile and sourced by big_bang.sh before calling this script")
+			assert(filepath.IsAbs(dir), "exported in $ZDOTDIR/.zprofile and sourced by bootstrap.lua before calling this script")
 		}
 
 
@@ -261,8 +261,8 @@ func main() {
 		assert(dir_exists(big_bang_dotfiles_os_specific), "included in the big bang repo")
 		assert(dir_exists(BIG_BANG_GIT_DIR),             "the repo is cloned into $HOME/code/big_bang")
 		assert(dir_exists(BIG_BANG_DATA_DIR),                 "hosts BIG_BANG_SHARE")
-		assert(dir_exists(BIG_BANG_SHARE),                "created by big_bang.sh hosting GOROOT and GOPATH")
-		assert(dir_exists(BIG_BANG_BIN),                  "created by big_bang.sh hosting go.exe")
+		assert(dir_exists(BIG_BANG_SHARE),                "created by bootstrap.lua hosting GOROOT and GOPATH")
+		assert(dir_exists(BIG_BANG_BIN),                  "created by bootstrap.lua hosting go.exe")
 
 
 		os.MkdirAll(BIG_BANG_SHARE, 0755)
