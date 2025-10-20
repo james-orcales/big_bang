@@ -54,39 +54,82 @@ function unimplemented()
 end
 
 
+function INFO (fmt, ...) print(string.format("%s|INFO |"..fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
+function WARN (fmt, ...) print(string.format("%s|WARN |"..fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
+function ERROR(fmt, ...) print(string.format("%s|ERROR|"..fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
+function DEBUG(fmt, ...) print(string.format("%s|DEBUG|"..fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
+
+
+CURRENT_PROCESS_ENVIRONMENT = (function() 
+        local env    = {}
+        local cmd    = io.popen("env")
+        local output = cmd:read("*a")
+        cmd:close()
+        for k, v in output:gmatch("([%w_]+)=([^\n]+)") do
+                env[k] = v
+        end
+        return env
+end)()
+-- NEVER mutate this
+ORIGINAL_PROCESS_ENVIRONMENT = (function()
+        local copy = {}
+        for k, v in pairs(CURRENT_PROCESS_ENVIRONMENT) do
+                assert(type(v) ~= "table", "any nested table will make this whole table a shared reference")
+                assert(type(v) == "string")
+                copy[k] = v
+        end
+        return copy
+end)()
+function os.getenv(key)
+        assert(type(key) == "string" and key ~= "")
+        return CURRENT_PROCESS_ENVIRONMENT[key]
+end
+
+
 -- Run shell commands with pipe or exec semantics
 function sh(...)
-        local n = select('#', ...)
-        if select(n, ...) == "|" then
-                local command = table.concat({...}, " ", 1, n - 1)
+        local n = select("#", ...)
+        assert(n > 0)
+
+
+        local diff = {}
+        for k, v in pairs(CURRENT_PROCESS_ENVIRONMENT) do
+                if ORIGINAL_PROCESS_ENVIRONMENT[k] ~= v then
+                        table.insert(diff, string.format("%s='%s'", k, v:gsub("'", "\'")))
+                end
+        end
+        local prefix = (#diff > 0) and table.concat(diff, " ")..";" or ""
+
+
+        local args = {...}
+        local is_piped = args[n] == "|"
+        if is_piped then
+                args[n] = nil
+        end
+        local command = prefix..table.concat(args, " ")
+
+
+        if is_piped then
                 local handle  = io.popen(command)
                 local output  = handle:read("*a")
                 handle:close()
                 return (output:gsub("\n$", ""))
         else
-                local command = table.concat({...}, " ")
                 return os.execute(command) == 0
         end
 end
 
 
+-- sourcing implies numerous possible side effects. this only cares about env variables
 function source(filepath)
         assert(type(filepath) == "string" and filepath ~= "")
         INFO("sourcing %s", filepath)
-        NEW_ENVIRONMENT = {}
-        for k, v in sh("zsh -c env", "|"):gmatch("([%w_]+)=([^\n]+)") do
-                NEW_ENVIRONMENT[k] = v
-        end
-        function os.getenv(key)
-                return NEW_ENVIRONMENT[key]
+        assert(operating_system == "Darwin")
+        local cmd = string.format("zsh -c 'source %q; env'", filepath)
+        for k, v in sh(cmd, "|"):gmatch("([%w_]+)=([^\n]+)") do
+                CURRENT_PROCESS_ENVIRONMENT[k] = v
         end
 end
-
-
-function INFO (fmt, ...) print(string.format("%s|INFO |"..fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
-function WARN (fmt, ...) print(string.format("%s|WARN |"..fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
-function ERROR(fmt, ...) print(string.format("%s|ERROR|"..fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
-function DEBUG(fmt, ...) print(string.format("%s|DEBUG|"..fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
 
 
 function with_file(path, mode, fn, ...)
@@ -156,7 +199,7 @@ end
 operating_system = sh("uname",    "|")
 cpu_architecture = sh("uname -m", "|")
 assert(
-        sh("basename $(pwd)", "|") == "big_bang" and sh("git rev-parse --is-inside-work-tree 2>/dev/null", "|") == "true" ,
+        sh("basename $(pwd)", "|") == "big_bang" and sh("git rev-parse --is-inside-work-tree 2>/dev/null", "|") == "true",
         "Working directory is the cloned repository"
 )
 assert(
