@@ -203,6 +203,11 @@ func main() {
 			Checksum:      "25710495177762f9df2dccaf5e7deed8e5ec70871b7ad385cffa8f7de0646d1d",
 		},
 		{
+			Name:          "lazydocker",
+			Download_Link: "https://github.com/jesseduffield/lazydocker/releases/download/v0.24.1/lazydocker_0.24.1_Darwin_arm64.tar.gz",
+			Checksum:      "7b4c73c7b1b62b9702a701ac0a8a1d8913602173362e8ee96d4fc03ef556ad10",
+		},
+		{
 			Name:          "hyperfine",
 			Download_Link: "https://github.com/sharkdp/hyperfine/releases/download/v1.19.0/hyperfine-v1.19.0-aarch64-apple-darwin.tar.gz",
 			Checksum:      "502e7c7f99e7e1919321eaa23a4a694c34b1b92d99cbd773a4a2497e100e088f", // manual
