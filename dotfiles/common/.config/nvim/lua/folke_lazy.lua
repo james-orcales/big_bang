@@ -20,10 +20,12 @@ require("lazy").setup({
                         config = function()
                                 local leap = require("leap")
 
+
                                 leap.opts.safe_labels = {}
                                 leap.opts.labels = "setnriaofuplwyqjbmghdzxc"
                                 leap.opts.max_phase_one_targets = 0
                                 leap.opts.special_keys.next_group = "<space>"
+
 
                                 vim.keymap.set({ "n", "x", "o" }, "t", "<Plug>(leap)")
                                 vim.api.nvim_set_hl(0, "LeapBackdrop", { link = "Comment" })
@@ -66,7 +68,8 @@ require("lazy").setup({
                                                 }
                                         },
                                 })
-                                
+
+
                                 local function module_api_search()
                                         programming_language = nil
                                         local handle = vim.uv.fs_scandir(vim.uv.cwd())
@@ -93,6 +96,7 @@ require("lazy").setup({
                                                 fzf.live_grep()
                                                 return
                                         end
+
 
                                         local items = nil
                                         if programming_language == "Golang" then
@@ -167,11 +171,12 @@ require("lazy").setup({
                                                 }
                                         )
                                 end
-                                vim.keymap.set("n", "<Space>",   fzf.files)
                                 vim.keymap.set("n", "<C-Space>", fzf.builtin)
+                                vim.keymap.set("n", "f<Space>",   fzf.files)
                                 vim.keymap.set("n", "s<Space>",  module_api_search)
                                 vim.keymap.set("n", "h<Space>",  function() fzf.help_tags ({ previewer = false }) end )
                                 vim.keymap.set("n", "m<Space>",  function() fzf.manpages  ({ previewer = false }) end )
+
 
                         end,
                 },

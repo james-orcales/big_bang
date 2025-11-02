@@ -240,6 +240,8 @@ SHELL_CONFIG = {
 
                 export CARGO_HOME="$BIG_BANG_SHARE/rust/.cargo"
                 export RUSTUP_HOME="$BIG_BANG_SHARE/rust/.rustup"
+                # for odin
+                export PATH="/opt/homebrew/opt/llvm@20/bin:$PATH"
 
 
                 export HOMEBREW_NO_AUTO_UPDATE=true
