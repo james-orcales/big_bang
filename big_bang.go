@@ -89,6 +89,77 @@ var (
 // TODO: Have checksums for artifacts list and homebrew list where you're forced to update these manually just like with nix. This would need type
 // 	 Artifact to implement Stringer
 func main() {
+	logger := New_Logger(Log_Level_Debug)
+	switch runtime.GOOS {
+	case "windows": 
+		fmt.Println("it's a cold day in hell eh?")
+		os.Exit(1)
+	case "darwin":
+		if runtime.GOARCH != "arm64" {
+			fmt.Println("let that rest in peace.")
+			os.Exit(1)
+		}
+	case "linux": 
+		fmt.Println("haven't tested this script here. cover x86_64 and arm64. check distro with /etc/os-release")
+		os.Exit(1)
+	default: 
+		fmt.Println("os unsupported")
+		os.Exit(1)
+	}
+	assert(runtime.Version() == "go1.25.3", "Only one go version is supported")
+
+
+	prerequisites := map[string]string{
+		"git":    "clones the big bang repo hosting bootstrap.lua, big_bang.go, and the dotfiles",
+		"sh":     "bootstrap.lua: shell to execute",
+		"curl":   "bootstrap.lua: downloads golang",
+		"sha256": "bootstrap.lua: checksums golang",
+		"tar":    "bootstrap.lua: unpacks go<version>.tar.gz. also unpacks .xz files because Go doesn't have it in the std lib",
+	}
+	for dependency := range prerequisites {
+		if path, _ := exec.LookPath(dependency); path != "" {
+			delete(prerequisites, dependency)
+		}
+	}
+	assert(len(prerequisites) == 0, "%#v", prerequisites)
+
+
+	var err_setup = func() error {
+		for _, dir := range []string{BIG_BANG_DATA_DIR, BIG_BANG_TMP, BIG_BANG_SHARE, BIG_BANG_BIN} {
+			assert(filepath.IsAbs(dir), "exported in $ZDOTDIR/.zprofile and sourced by bootstrap.lua before calling this script")
+		}
+
+
+		assert(dir_exists(big_bang_dotfiles),             "included in the big bang repo")
+		assert(dir_exists(big_bang_dotfiles_common),      "included in the big bang repo")
+		assert(dir_exists(big_bang_dotfiles_os_specific), "included in the big bang repo")
+		assert(dir_exists(BIG_BANG_GIT_DIR),              "the repo is cloned into $HOME/code/big_bang")
+		assert(dir_exists(BIG_BANG_DATA_DIR),             "hosts BIG_BANG_SHARE")
+		assert(dir_exists(BIG_BANG_SHARE),                "created by bootstrap.lua hosting GOROOT and GOPATH")
+		assert(dir_exists(BIG_BANG_BIN),                  "created by bootstrap.lua hosting go.exe")
+
+
+		os.MkdirAll(BIG_BANG_SHARE, 0755)
+		os.MkdirAll(BIG_BANG_MAN,   0755)
+		if err := os.RemoveAll(BIG_BANG_TMP); err != nil { 
+			return err 
+		}
+		if err := os.MkdirAll(BIG_BANG_TMP, 0755); err != nil { 
+			return err 
+		}
+		// Just a safety measure in case I mess up paths. I still use absolute paths for everything.
+		if err := os.Chdir(BIG_BANG_DATA_DIR); err != nil { 
+			return err 
+		}
+		return nil
+	}()
+	defer os.RemoveAll(BIG_BANG_TMP)
+	if err_setup != nil {
+		logger.Error(err_setup).Msg("initiliazing environment")
+		return
+	}
+
+
 	// TODO: man pages. `foo.1-8``
 	artifacts := []Artifact{
 		{
@@ -101,7 +172,6 @@ func main() {
 						actual_raw, _     := version_check.Output()
 						actual := strings.TrimSpace(string(actual_raw))
 						if actual == expect {
-							logger.Info().Msg("fish is already installed")
 							return
 						} 
 						// TODO: Info().Bytes()
@@ -112,7 +182,6 @@ func main() {
 					}
 				}
 				logger.Info().Begin("installing fish")
-				defer logger.Info().Done("installing fish")
 				if path := which("cargo"); path != "" {
 					assert(filepath.IsAbs(path))
 					assert(filepath.IsAbs(BIG_BANG_SHARE))
@@ -156,11 +225,13 @@ func main() {
 					logger.Error(err).Msg("cargo install")
 					return
 				}
+				logger.Info().Done("installing fish")
 				return
 			},
 		},
 		{
 			Name: "tokei",
+			// Latest binary release was back in 2023
 			Install: func(logger *Logger) {
 				if path := which("tokei"); path != "" {
 					assert(filepath.IsAbs(path))
@@ -170,10 +241,10 @@ func main() {
 					}
 				}
 				logger.Info().Begin("installing")
-				defer logger.Info().Done("installing")
 				if err := execute("", nil, "cargo", "install", "--quiet", "tokei", "--version=12.1.2"); err != nil {
 					logger.Error(err).Msg("cargo install")
 				}
+				logger.Info().Done("installing")
 			},
 		},
 		{
@@ -205,89 +276,41 @@ func main() {
 		{
 			Name:          "lazydocker",
 			Download_Link: "https://github.com/jesseduffield/lazydocker/releases/download/v0.24.1/lazydocker_0.24.1_Darwin_arm64.tar.gz",
-			Checksum:      "7b4c73c7b1b62b9702a701ac0a8a1d8913602173362e8ee96d4fc03ef556ad10",
+			Checksum:      "55d8ff53d9bd36ee088393154442d3b93db787118be5ad0ae80c200d76311ec2",
 		},
 		{
 			Name:          "hyperfine",
 			Download_Link: "https://github.com/sharkdp/hyperfine/releases/download/v1.19.0/hyperfine-v1.19.0-aarch64-apple-darwin.tar.gz",
-			Checksum:      "502e7c7f99e7e1919321eaa23a4a694c34b1b92d99cbd773a4a2497e100e088f", // manual
+			Checksum:      "502e7c7f99e7e1919321eaa23a4a694c34b1b92d99cbd773a4a2497e100e088f", // manually calculated
 		},
 		{
 			Name:          "fastfetch",
 			Download_Link: "https://github.com/fastfetch-cli/fastfetch/releases/download/2.48.1/fastfetch-macos-aarch64.zip",
 			Checksum:      "a1279a5a12ab22f33bcede94108ae501c9c8b27a20629b23481f155f69b7f62d",
 		},
-	}
-
-
-	logger := New_Logger(Log_Level_Debug)
-	switch runtime.GOOS {
-	case "windows": 
-		fmt.Println("it's a cold day in hell eh?")
-		os.Exit(1)
-	case "darwin":
-		if runtime.GOARCH != "arm64" {
-			fmt.Println("let that rest in peace.")
-			os.Exit(1)
-		}
-	case "linux": 
-		fmt.Println("haven't tested this script here. cover x86_64 and arm64. check distro with /etc/os-release")
-		os.Exit(1)
-	default: 
-		fmt.Println("os unsupported")
-		os.Exit(1)
-	}
-	assert(runtime.Version() == "go1.23.12", "only one supported go version")
-
-
-	prerequisites := map[string]string{
-		"git":    "clones the big bang repo hosting bootstrap.lua, big_bang.go, and the dotfiles",
-		"sh":     "bootstrap.lua: shell to execute",
-		"curl":   "bootstrap.lua: downloads golang",
-		"sha256": "bootstrap.lua: checksums golang",
-		"tar":    "bootstrap.lua: unpacks go<version>.tar.gz. also unpacks .xz files because Go doesn't have it in the std lib",
-	}
-	for dependency := range prerequisites {
-		if path, _ := exec.LookPath(dependency); path != "" {
-			delete(prerequisites, dependency)
-		}
-	}
-	assert(len(prerequisites) == 0, "%#v", prerequisites)
-
-
-	var err_setup = func() error {
-		for _, dir := range []string{BIG_BANG_DATA_DIR, BIG_BANG_TMP, BIG_BANG_SHARE, BIG_BANG_BIN} {
-			assert(filepath.IsAbs(dir), "exported in $ZDOTDIR/.zprofile and sourced by bootstrap.lua before calling this script")
-		}
-
-
-		assert(dir_exists(big_bang_dotfiles),             "included in the big bang repo")
-		assert(dir_exists(big_bang_dotfiles_common),      "included in the big bang repo")
-		assert(dir_exists(big_bang_dotfiles_os_specific), "included in the big bang repo")
-		assert(dir_exists(BIG_BANG_GIT_DIR),             "the repo is cloned into $HOME/code/big_bang")
-		assert(dir_exists(BIG_BANG_DATA_DIR),                 "hosts BIG_BANG_SHARE")
-		assert(dir_exists(BIG_BANG_SHARE),                "created by bootstrap.lua hosting GOROOT and GOPATH")
-		assert(dir_exists(BIG_BANG_BIN),                  "created by bootstrap.lua hosting go.exe")
-
-
-		os.MkdirAll(BIG_BANG_SHARE, 0755)
-		os.MkdirAll(BIG_BANG_MAN,   0755)
-		if err := os.RemoveAll(BIG_BANG_TMP); err != nil { 
-			return err 
-		}
-		if err := os.MkdirAll(BIG_BANG_TMP, 0755); err != nil { 
-			return err 
-		}
-		// Just a safety measure in case I mess up paths. I still use absolute paths for everything.
-		if err := os.Chdir(BIG_BANG_DATA_DIR); err != nil { 
-			return err 
-		}
-		return nil
-	}()
-	defer os.RemoveAll(BIG_BANG_TMP)
-	if err_setup != nil {
-		logger.Error(err_setup).Msg("initiliazing environment")
-		return
+		{
+			Name:          "gofumpt",
+			Download_Link: "https://github.com/mvdan/gofumpt/releases/download/v0.9.2/gofumpt_v0.9.2_darwin_arm64",
+			Checksum:      "c241fb742599a6cb0563d7377f59def65d451b23dd718dbc6ddf4ab5e695e8f1",
+		},
+		{
+			Name: "stylua",
+			// Compiling from source disables support for other lua versions.
+			Install: func(logger *Logger) {
+				if path := which("stylua"); path != "" {
+					assert(filepath.IsAbs(path))
+					assert(filepath.IsAbs(BIG_BANG_DATA_DIR))
+					if strings.HasPrefix(path, BIG_BANG_DATA_DIR) {
+                                                return
+					}
+				}
+				logger.Info().Begin("installing")
+				if err := execute("", nil, "cargo", "install", "--quiet", "stylua", "--version=2.3.1"); err != nil {
+					logger.Error(err).Msg("cargo install")
+				}
+				logger.Info().Done("installing")
+			},
+		},
 	}
 
 
@@ -312,7 +335,7 @@ func main() {
 			},
 		},
 		"dotfiles_sync": Info{
-			description: "Synchronizes dotfiles from big_bang/dotfiles to $HOME by creating missing files or truncating existing files. It will never delete other files.",
+			description: "Synchronizes dotfiles from big_bang/dotfiles to $HOME by creating missing files or overwriting existing files. It will never delete other files.",
 			action: func() {
 				files := mismatched_dotfiles(logger)
 				if len(files) == 0 {
@@ -372,7 +395,7 @@ func main() {
 			},
 		},
 		"dependencies_install":  Info{
-			description: "WIP",
+			description: "install all dependencies",
 			action: func() {
 				total_ctx, total_cancel := context.WithTimeout(context.Background(), time.Minute * 15)
 				defer total_cancel()
@@ -387,7 +410,6 @@ func main() {
 						"artifacts without a custom install step means their binaries are downloaded directly",
 					)
 					if path := which(artifact.Name); strings.HasPrefix(path, BIG_BANG_DATA_DIR) {
-						logger.Info().Str("artifact", artifact.Name).Msg("already installed")
 						continue
 					}
 					wg.Add(1)

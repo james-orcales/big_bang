@@ -1,20 +1,20 @@
 --  Copyright 2025 Danzig James Orcales
---  
---  
+--
+--
 --  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
---  
---  
+--
+--
 --  1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
---  
---  
+--
+--
 --  2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or
 --  other materials provided with the distribution.
---  
---  
+--
+--
 --  3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without
 --  specific prior written permission.
---  
---  
+--
+--
 --  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 --  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY
 --  DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
@@ -25,6 +25,7 @@
 assert(_VERSION == "Lua 5.1")
 
 
+-- stylua: ignore start
 HOME = assert(os.getenv("XDG_CONFIG_HOME") or os.getenv("HOME"))
 HOME = HOME .. "/"
 BIG_BANG_GIT_DIR  = os.getenv("BIG_BANG_GIT_DIR")
@@ -35,6 +36,7 @@ BIG_BANG_MAN      = os.getenv("BIG_BANG_MAN")
 BIG_BANG_TMP      = os.getenv("BIG_BANG_TMP")
 CARGO_HOME        = os.getenv("CARGO_HOME")
 RUSTUP_HOME       = os.getenv("RUSTUP_HOME")
+-- stylua: ignore end
 
 
 -- === HELPER FUNCTIONS ===
@@ -54,15 +56,17 @@ function unimplemented()
 end
 
 
-function INFO (fmt, ...) print(string.format("%s|INFO |"..fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
-function WARN (fmt, ...) print(string.format("%s|WARN |"..fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
-function ERROR(fmt, ...) print(string.format("%s|ERROR|"..fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
-function DEBUG(fmt, ...) print(string.format("%s|DEBUG|"..fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
+-- stylua: ignore start
+function INFO(fmt,  ...) print(string.format("%s|INFO |" .. fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
+function WARN(fmt,  ...) print(string.format("%s|WARN |" .. fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
+function ERROR(fmt, ...) print(string.format("%s|ERROR|" .. fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
+function DEBUG(fmt, ...) print(string.format("%s|DEBUG|" .. fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
+-- stylua: ignore end
 
 
-CURRENT_PROCESS_ENVIRONMENT = (function() 
-        local env    = {}
-        local cmd    = io.popen("env")
+CURRENT_PROCESS_ENVIRONMENT = (function()
+        local env = {}
+        local cmd = io.popen("env")
         local output = cmd:read("*a")
         cmd:close()
         for k, v in output:gmatch("([%w_]+)=([^\n]+)") do
@@ -95,23 +99,23 @@ function sh(...)
         local diff = {}
         for k, v in pairs(CURRENT_PROCESS_ENVIRONMENT) do
                 if ORIGINAL_PROCESS_ENVIRONMENT[k] ~= v then
-                        table.insert(diff, string.format("%s='%s'", k, v:gsub("'", "\'")))
+                        table.insert(diff, string.format("%s='%s'", k, v:gsub("'", "'")))
                 end
         end
-        local prefix = (#diff > 0) and table.concat(diff, " ")..";" or ""
+        local prefix = (#diff > 0) and table.concat(diff, " ") .. ";" or ""
 
 
-        local args = {...}
+        local args = { ... }
         local is_piped = args[n] == "|"
         if is_piped then
                 args[n] = nil
         end
-        local command = prefix..table.concat(args, " ")
+        local command = prefix .. table.concat(args, " ")
 
 
         if is_piped then
-                local handle  = io.popen(command)
-                local output  = handle:read("*a")
+                local handle = io.popen(command)
+                local output = handle:read("*a")
                 handle:close()
                 return (output:gsub("\n$", ""))
         else
@@ -135,7 +139,7 @@ end
 function with_file(path, mode, fn, ...)
         assert(type(path) == "string" and path ~= "")
         assert(type(mode) == "string" and mode ~= "")
-        assert(type(fn)   == "function")
+        assert(type(fn) == "function")
 
 
         local handle, open_err = io.open(path, mode)
@@ -157,7 +161,7 @@ function with_file(path, mode, fn, ...)
 end
 
 
-function read_file(path) 
+function read_file(path)
         local _, content = with_file(path, "r", function(handle)
                 return handle:read("*a")
         end)
@@ -166,8 +170,8 @@ function read_file(path)
 end
 
 
-function write_file(path, content) 
-        assert(type(path)    == "string" and path    ~= "")
+function write_file(path, content)
+        assert(type(path) == "string" and path ~= "")
         assert(type(content) == "string" and content ~= "")
         local _, content = with_file(path, "w", function(handle)
                 handle:write(content)
@@ -176,7 +180,7 @@ end
 
 
 function string.has_prefix(str, prefix)
-        assert(type(str)    == "string")
+        assert(type(str) == "string")
         assert(type(prefix) == "string")
         return str:sub(1, #prefix) == prefix
 end
@@ -184,7 +188,7 @@ end
 
 function path(...)
         assert(type(HOME) == "string")
-        local final, _ = table.concat({...}, "/"):gsub("/+", "/")
+        local final, _ = table.concat({ ... }, "/"):gsub("/+", "/")
         assert(not final:match("%s"), "shame on you for using paths with spaces")
         return final
 end
@@ -196,25 +200,25 @@ end
 -- === PREREQUISITE ===
 
 
-operating_system = sh("uname",    "|")
+operating_system = sh("uname", "|")
 cpu_architecture = sh("uname -m", "|")
 assert(
         sh("basename $(pwd)", "|") == "big_bang" and sh("git rev-parse --is-inside-work-tree 2>/dev/null", "|") == "true",
         "Working directory is the cloned repository"
 )
 assert(
-        (operating_system == "Darwin" and cpu_architecture == "arm64") or
-        (operating_system == "Linux"  and cpu_architecture == "x86_64" and string.match(read_file("/etc/os-release"), "^ID=debian")),
+        (operating_system == "Darwin" and cpu_architecture == "arm64")
+                or (operating_system == "Linux" and cpu_architecture == "x86_64" and string.match(read_file("/etc/os-release"), "^ID=debian")),
         "System is supported"
 )
 assert(
-        (operating_system == "Darwin" and string.match(sh("ls -l /private/var/select/sh", "|"), "/bin/bash" )) or
-        (operating_system == "Linux"  and string.match(sh("ls -l /bin/sh", "|"), "/bin/dash" )),
+        (operating_system == "Darwin" and string.match(sh("ls -l /private/var/select/sh", "|"), "/bin/bash"))
+                or (operating_system == "Linux" and string.match(sh("ls -l /bin/sh", "|"), "/bin/dash")),
         "POSIX shell is the default"
 )
 assert(
-        (operating_system == "Darwin" and string.match(os.getenv("SHELL"), "/bin/zsh" )) or
-        (operating_system == "Linux"  and string.match(os.getenv("SHELL"), "/bin/bash")),
+        (operating_system == "Darwin" and string.match(os.getenv("SHELL"), "/bin/zsh"))
+                or (operating_system == "Linux" and string.match(os.getenv("SHELL"), "/bin/bash")),
         "Interactive shell is the default"
 )
 
@@ -222,11 +226,11 @@ assert(
 -- === END OF PREREQUISITES ===
 
 
--- "Why are you hardcoding this here? Isn't the whole point of this repo that you manage your dotfiles manually?"
+-- "Why are you hardcoding this here?"
 --      The shell config is essential to this bootstrapping so its better to keep its context inside this file.
 SHELL_CONFIG = {
-        { 
-                path(HOME,".zshenv"), 
+        {
+                path(HOME, ".zshenv"),
                 [[
                 export BIG_BANG_GIT_DIR="$HOME/code/big_bang"
                 # A good reason not to use .local/share is to keep the PATH variable short. I want to avoid symlinks and hardcode all variables. A possible
@@ -236,6 +240,10 @@ SHELL_CONFIG = {
                 export BIG_BANG_BIN="$BIG_BANG_DATA_DIR/bin"
                 export BIG_BANG_MAN="$BIG_BANG_DATA_DIR/man"
                 export BIG_BANG_TMP="$BIG_BANG_DATA_DIR/tmp"
+
+
+                export GOPATH="$BIG_BANG_SHARE/go-path/"
+                export PATH="/$GOPATH/bin:$PATH"
 
 
                 export CARGO_HOME="$BIG_BANG_SHARE/rust/.cargo"
@@ -259,10 +267,10 @@ SHELL_CONFIG = {
                 --bind='end:last'                  \
                 "
                 export EDITOR=nvim
-                ]]
+                ]],
         },
-        { 
-                path(HOME,".zprofile"), 
+        {
+                path(HOME, ".zprofile"),
                 [[ 
                 export PATH="$HOME/.local/bin:$PATH"
                 if brew --version > /dev/null; then
@@ -280,10 +288,10 @@ SHELL_CONFIG = {
 
 
                 export MANPATH="$BIG_BANG_MAN:$MANPATH"
-                ]]
+                ]],
         },
         {
-                path(HOME,".zshrc"),
+                path(HOME, ".zshrc"),
                 [[
                 # Execute fish in zshrc because the nix installer adds nix to PATH after $HOME/.zprofile is sourced.
                 if command -v fish >/dev/null && test "$EXIT_OUT_OF_FISH" = ""; then
@@ -302,7 +310,7 @@ function env_setup()
                         local path, expect = unpack(config)
                         local actual = read_file(path)
                         if actual ~= expect then
-                                INFO("updating "..path)
+                                INFO("updating " .. path)
                                 write_file(path, expect)
                                 source(path)
                         end
@@ -320,14 +328,14 @@ end
 
 
 function install_golang()
-        assert(type(operating_system)  == "string" and operating_system  ~= "")
-        assert(type(cpu_architecture)  == "string" and cpu_architecture  ~= "")
+        assert(type(operating_system) == "string" and operating_system ~= "")
+        assert(type(cpu_architecture) == "string" and cpu_architecture ~= "")
         assert(type(BIG_BANG_DATA_DIR) == "string" and BIG_BANG_DATA_DIR ~= "")
-        assert(type(BIG_BANG_SHARE)    == "string" and BIG_BANG_SHARE    ~= "")
-        assert(type(BIG_BANG_TMP)      == "string" and BIG_BANG_TMP      ~= "")
+        assert(type(BIG_BANG_SHARE) == "string" and BIG_BANG_SHARE ~= "")
+        assert(type(BIG_BANG_TMP) == "string" and BIG_BANG_TMP ~= "")
 
 
-        local version = "1.23.12"
+        local version = "1.25.3"
         if sh("command -v go", "|"):has_prefix(BIG_BANG_DATA_DIR) then
                 if sh("go version 2>/dev/null", "|"):match(version) then
                         INFO(string.format("golang v%s is already installed", version))
@@ -341,36 +349,39 @@ function install_golang()
         local release, checksum
         if operating_system == "Darwin" then
                 release = string.format([[go%s.darwin-arm64.tar.gz]], version)
-                checksum = "5bfa117e401ae64e7ffb960243c448b535fe007e682a13ff6c7371f4a6f0ccaa"
+                checksum = "7c083e3d2c00debfeb2f77d9a4c00a1aac97113b89b9ccc42a90487af3437382"
         elseif operating_system == "Linux" then
                 release = string.format([[go%s.linux-amd64.tar.gz]], version)
-                checksum = "d3847fef834e9db11bf64e3fb34db9c04db14e068eeb064f49af747010454f90"
+                checksum = "0335f314b6e7bfe08c3d0cfaa7c19db961b7b99fb20be62b0a826c992ad14e0f"
         else
                 unreachable()
         end
         INFO("downloading go")
         local download_location = path(BIG_BANG_TMP, release)
-        local download_url = "https://go.dev/dl/"..release
-        if not sh(
-                string.format(
-                        "curl --proto '=https' --fail --show-error --location --retry 10 --output %s -- %s; then ",
-                        download_location,
-                        download_url
+        local download_url = "https://go.dev/dl/" .. release
+        if
+                not sh(
+                        string.format(
+                                "curl --proto '=https' --fail --show-error --location --output %s --connect-timeout 5 -- %s",
+                                download_location,
+                                download_url
+                        )
                 )
-        ) then
+        then
                 ERROR("failed to download go binary")
                 return false
         end
-        if not sh("sha256 --quiet --check=%s -- %s", checksum, download_location) then
+        -- never ever use the flags of this god forsaken command.
+        if not sh("sha256", download_location, "|"):find(checksum) then
                 ERROR("mismatched golang installation checksum")
                 return false
         end
-        if not sh([[tar --extract --gzip --file=%s --directory=%s]], download_location, BIG_BANG_SHARE) then
-                ERROR("extracting "..release)
+        if not sh(string.format([[tar --extract --gzip --file=%s --directory=%s]], download_location, BIG_BANG_SHARE)) then
+                ERROR("extracting " .. release)
                 return false
         end
         assert(sh("go version", "|"):match(version))
-        if not sh([[go env -w GOPATH=%s]], path(BIG_BANG_DATA_DIR, "/go-path")) then
+        if not sh(string.format([[go env -w GOPATH=%s]], path(BIG_BANG_DATA_DIR, "/go-path"))) then
                 ERROR("updating GOPATH")
                 return false
         end
@@ -380,11 +391,13 @@ end
 
 function install_cargo()
         assert(type(BIG_BANG_DATA_DIR) == "string" and BIG_BANG_DATA_DIR ~= "")
-        assert(type(CARGO_HOME)    == "string" and CARGO_HOME    ~= "")
-        assert(type(RUSTUP_HOME)   == "string" and RUSTUP_HOME   ~= "")
-        if sh("command -v cargo",  "|"):has_prefix(BIG_BANG_DATA_DIR) and
-                sh("command -v rustup", "|"):has_prefix(BIG_BANG_DATA_DIR) and
-                sh("command -v rustc",  "|"):has_prefix(BIG_BANG_DATA_DIR) then
+        assert(type(CARGO_HOME) == "string" and CARGO_HOME ~= "")
+        assert(type(RUSTUP_HOME) == "string" and RUSTUP_HOME ~= "")
+        if
+                sh("command -v cargo", "|"):has_prefix(BIG_BANG_DATA_DIR)
+                and sh("command -v rustup", "|"):has_prefix(BIG_BANG_DATA_DIR)
+                and sh("command -v rustc", "|"):has_prefix(BIG_BANG_DATA_DIR)
+        then
                 INFO("cargo, rustup, and rustc are already installed")
                 return true
         else
@@ -397,7 +410,9 @@ function install_cargo()
                         return false
                 end
                 INFO("installing cargo")
-                local ok = sh("curl --proto '=https' --tlsv1.2 --silent --show-error --fail https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain=stable")
+                local ok = sh(
+                        "curl --proto '=https' --tlsv1.2 --silent --show-error --fail https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain=stable"
+                )
                 if ok then
                         return true
                 else
@@ -419,7 +434,9 @@ function install_homebrew()
         end
         INFO("installing homebrew")
         assert(os.getenv("HOMEBREW_BUNDLE_FILE"))
-        write_file(os.getenv("HOMEBREW_BUNDLE_FILE"), [[
+        write_file(
+                os.getenv("HOMEBREW_BUNDLE_FILE"),
+                [[
 cask "ghostty"
 cask "visual-studio-code"
 cask "firefox"
@@ -427,8 +444,13 @@ cask "microsoft-edge"
 cask "cryptomator"
 cask "veracrypt"
 cask "obs"
-]])
-        if not sh([[NONINTERACTIVE=1 /bin/bash -c "$(curl --fail --silent --show-error --location https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"]]) then
+]]
+        )
+        if
+                not sh(
+                        [[NONINTERACTIVE=1 /bin/bash -c "$(curl --fail --silent --show-error --location https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"]]
+                )
+        then
                 ERROR("installing homebrew")
                 return false
         end
@@ -475,7 +497,7 @@ github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+V
                 end
                 -- TODO: Execute this to enable ssh keys in the current shell immediately.
                 -- We can print then `eval "$(bin/lua bootstrap.lua)"` but we'd have to ensure that nothing else is mixed in with stdout.
-                -- eval "$(ssh-agent -s)" 
+                -- eval "$(ssh-agent -s)"
                 INFO("Execute this to enable the ssh agent in the current shell: %s", [[eval "$(ssh-agent -s)"]])
                 sh("ssh-add --apple-use-keychain $HOME/.ssh/id_ed25519")
                 sh("pbcopy < $HOME/.ssh/id_ed25519.pub")
@@ -489,7 +511,7 @@ github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+V
 end
 
 
-function system_preferences() 
+function system_preferences()
         if operating_system ~= "Darwin" then
                 unimplemented()
         end
@@ -548,7 +570,7 @@ function system_preferences()
           defaults write NSGlobalDomain "NSAutomaticQuoteSubstitutionEnabled"  -bool   "false"
           defaults write NSGlobalDomain "NSAutomaticSpellingCorrectionEnabled" -bool   "false"
 ]])
-        if ok then 
+        if ok then
                 return true
         else
                 ERROR("Setting up system preferences")
@@ -564,7 +586,9 @@ function main()
         assert(env_setup(), "Environment setup is essential")
         install_homebrew()
         install_cargo()
-        install_golang()
+        if not install_golang() then
+                os.exit(1)
+        end
         print([[=== go run big_bang.go dotfiles_sync ===]])
         sh("go run big_bang.go dotfiles_sync")
         print("=== Bootstrap Finished ===")
