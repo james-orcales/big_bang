@@ -214,34 +214,43 @@ vim.api.nvim_create_autocmd("TextYankPost", {
 })
 
 
+local format_on_save_group = vim.api.nvim_create_augroup("format_on_save", { clear = true })
 vim.api.nvim_create_autocmd({ "BufWritePre" }, {
         desc = "Format on save",
-        group = vim.api.nvim_create_augroup("format_on_save", { clear = true }),
-        pattern = { "*.odin", "*.go", "*.py", "*.sh", "*.lua" },
+        group = format_on_save_group,
+        pattern = { "*.go", "*.lua", "*.py", "*.rs" },
         callback = function(ev)
                 local lines = vim.api.nvim_buf_get_lines(ev.buf, 0, -1, false)
-                do
-                        local ft = vim.bo[ev.buf].filetype
-                        local cmd
-                        if ft == "lua" then
-                                cmd = { "stylua", "-" }
-                        elseif ft == "go" then
-                                cmd = { "gofumpt" }
-                        end
-                        if cmd then
-                                local input = table.concat(lines, "\n")
-                                local result = vim.system(cmd, { stdin = input, text = true }):wait()
-                                if result.code == 0 then
-                                        lines = vim.split(result.stdout, "\n", { plain = true })
-                                        if lines[#lines] == "" then
-                                                table.remove(lines, #lines)
-                                        end
+                local ft = vim.bo[ev.buf].filetype
+                local cmd
+                if ft == "lua" then
+                        cmd = { "stylua", "-" }
+                elseif ft == "go" then
+                        cmd = { "gofumpt", "-extra" }
+                elseif ft == "rs" then
+                        cmd = { "rustfmt" }
+                end
+                if cmd then
+                        local input = table.concat(lines, "\n")
+                        local result = vim.system(cmd, { stdin = input, text = true }):wait()
+                        if result.code == 0 then
+                                lines = vim.split(result.stdout, "\n", { plain = true })
+                                if lines[#lines] == "" then
+                                        table.remove(lines, #lines)
                                 end
                         end
                 end
                 assert(#lines > 0)
-
-
+                vim.api.nvim_buf_set_lines(ev.buf, 0, -1, false, lines)
+        end,
+})
+-- Automatically formats files on save by normalizing blank lines:
+--     any run of one or more blank lines becomes exactly two blank lines.
+vim.api.nvim_create_autocmd({ "BufWritePre" }, {
+        desc = "Format on save",
+        group = format_on_save_group,
+        pattern = { "*.odin", "*.sh", "*.lua" },
+        callback = function(ev)
                 -- NOTE: I tried Ex commands with regex at first. The problem was that when undoing, the cursor would
                 -- jump to the top of the file.
                 --
@@ -249,6 +258,7 @@ vim.api.nvim_create_autocmd({ "BufWritePre" }, {
                 -- -- https://vim.fandom.com/wiki/Regex_lookahead_and_lookbehind
                 -- vim.cmd([[:%s/^\s*\n\{1,}/\r\r]])
                 -- vim.api.nvim_win_set_cursor(0, pos)
+                local lines = vim.api.nvim_buf_get_lines(ev.buf, 0, -1, false)
                 local new_lines = {}
                 local blank_streak = 0
                 for _, line in ipairs(lines) do
@@ -418,9 +428,6 @@ do
                                                 break
                                         elseif name:match("%.lua$") then
                                                 programming_language = "Lua"
-                                                break
-                                        elseif name:match("%.py$") then
-                                                programming_language = "Python"
                                                 break
                                         end
                                 end
