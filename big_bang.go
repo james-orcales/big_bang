@@ -45,7 +45,6 @@ import (
 	"unsafe"
 )
 
-
 var (
 	HOME = filepath.Clean(os.Getenv("HOME"))
 	PATH = func() []string {
@@ -66,7 +65,6 @@ var (
 	CARGO_HOME        = filepath.Clean(os.Getenv("CARGO_HOME"))
 	RUSTUP_HOME       = filepath.Clean(os.Getenv("RUSTUP_HOME"))
 
-
 	// A mirror of the home directory but only hosts dotfiles.
 	big_bang_dotfiles             = filepath.Clean(filepath.Join(BIG_BANG_GIT_DIR, "dotfiles"))
 	big_bang_dotfiles_common      = filepath.Join(big_bang_dotfiles, "common")
@@ -84,13 +82,13 @@ var (
 	}()
 )
 
-
 // TODO: Have checksums for artifacts list and homebrew list where you're forced to update these manually just like with nix. This would need type
-// 	 Artifact to implement Stringer
+//
+//	Artifact to implement Stringer
 func main() {
 	logger := New_Logger(Log_Level_Debug)
 	switch runtime.GOOS {
-	case "windows": 
+	case "windows":
 		fmt.Println("it's a cold day in hell eh?")
 		os.Exit(1)
 	case "darwin":
@@ -98,15 +96,14 @@ func main() {
 			fmt.Println("let that rest in peace.")
 			os.Exit(1)
 		}
-	case "linux": 
+	case "linux":
 		fmt.Println("haven't tested this script here. cover x86_64 and arm64. check distro with /etc/os-release")
 		os.Exit(1)
-	default: 
+	default:
 		fmt.Println("os unsupported")
 		os.Exit(1)
 	}
 	assert(runtime.Version() == "go1.25.3", "Only one go version is supported")
-
 
 	prerequisites := map[string]string{
 		"git":    "clones the big bang repo hosting bootstrap.lua, big_bang.go, and the dotfiles",
@@ -122,33 +119,30 @@ func main() {
 	}
 	assert(len(prerequisites) == 0, "%#v", prerequisites)
 
-
-	var err_setup = func() error {
+	err_setup := func() error {
 		for _, dir := range []string{BIG_BANG_DATA_DIR, BIG_BANG_TMP, BIG_BANG_SHARE, BIG_BANG_BIN} {
 			assert(filepath.IsAbs(dir), "exported in $ZDOTDIR/.zprofile and sourced by bootstrap.lua before calling this script")
 		}
 
-
-		assert(dir_exists(big_bang_dotfiles),             "included in the big bang repo")
-		assert(dir_exists(big_bang_dotfiles_common),      "included in the big bang repo")
+		assert(dir_exists(big_bang_dotfiles), "included in the big bang repo")
+		assert(dir_exists(big_bang_dotfiles_common), "included in the big bang repo")
 		assert(dir_exists(big_bang_dotfiles_os_specific), "included in the big bang repo")
-		assert(dir_exists(BIG_BANG_GIT_DIR),              "the repo is cloned into $HOME/code/big_bang")
-		assert(dir_exists(BIG_BANG_DATA_DIR),             "hosts BIG_BANG_SHARE")
-		assert(dir_exists(BIG_BANG_SHARE),                "created by bootstrap.lua hosting GOROOT and GOPATH")
-		assert(dir_exists(BIG_BANG_BIN),                  "created by bootstrap.lua hosting go.exe")
-
+		assert(dir_exists(BIG_BANG_GIT_DIR), "the repo is cloned into $HOME/code/big_bang")
+		assert(dir_exists(BIG_BANG_DATA_DIR), "hosts BIG_BANG_SHARE")
+		assert(dir_exists(BIG_BANG_SHARE), "created by bootstrap.lua hosting GOROOT and GOPATH")
+		assert(dir_exists(BIG_BANG_BIN), "created by bootstrap.lua hosting go.exe")
 
 		os.MkdirAll(BIG_BANG_SHARE, 0755)
-		os.MkdirAll(BIG_BANG_MAN,   0755)
-		if err := os.RemoveAll(BIG_BANG_TMP); err != nil { 
-			return err 
+		os.MkdirAll(BIG_BANG_MAN, 0755)
+		if err := os.RemoveAll(BIG_BANG_TMP); err != nil {
+			return err
 		}
-		if err := os.MkdirAll(BIG_BANG_TMP, 0755); err != nil { 
-			return err 
+		if err := os.MkdirAll(BIG_BANG_TMP, 0755); err != nil {
+			return err
 		}
 		// Just a safety measure in case I mess up paths. I still use absolute paths for everything.
-		if err := os.Chdir(BIG_BANG_DATA_DIR); err != nil { 
-			return err 
+		if err := os.Chdir(BIG_BANG_DATA_DIR); err != nil {
+			return err
 		}
 		return nil
 	}()
@@ -158,21 +152,20 @@ func main() {
 		return
 	}
 
-
 	// TODO: man pages. `foo.1-8``
 	artifacts := []Artifact{
 		{
-			Name:    "fish",
+			Name: "fish",
 			Install: func(logger *Logger) {
 				if path := which("fish"); path != "" {
 					if strings.HasPrefix(path, BIG_BANG_DATA_DIR) {
 						version_check := exec.Command("fish", "--version")
-						expect        := "fish, version 4.0.2"
-						actual_raw, _     := version_check.Output()
+						expect := "fish, version 4.0.2"
+						actual_raw, _ := version_check.Output()
 						actual := strings.TrimSpace(string(actual_raw))
 						if actual == expect {
 							return
-						} 
+						}
 						// TODO: Info().Bytes()
 						logger.Info().Str("current_version", actual).Str("target_version", expect).Msg("outdated installation")
 						defer func() {
@@ -194,10 +187,9 @@ func main() {
 				}
 				assert(strings.HasPrefix(filepath.Clean(os.Getenv("CARGO_HOME")), BIG_BANG_SHARE))
 
-
 				tmp_dir := filepath.Join(BIG_BANG_TMP, "fish-shell")
 				assert(filepath.IsAbs(tmp_dir))
-				if err := execute( "", nil,
+				if err := execute("", nil,
 					"git", "clone", "--quiet", "--depth=1", "--branch=4.0.2", "https://github.com/fish-shell/fish-shell/", tmp_dir,
 				); err != nil {
 					logger.Error(err).Msg("cloning git repo")
@@ -210,8 +202,8 @@ func main() {
 				if err := execute(
 					tmp_dir,
 					// Fabian Boehm: https://github.com/fish-shell/fish-shell/issues/10935#issuecomment-2558599433
-					[]string{"RUSTFLAGS=-C target-feature=+crt-static"}, 
-					"cargo",  "install", "--quiet", "--offline", "--path=.",
+					[]string{"RUSTFLAGS=-C target-feature=+crt-static"},
+					"cargo", "install", "--quiet", "--offline", "--path=.",
 					// https://users.rust-lang.org/t/the-source-requires-a-lock-file-to-be-present-first-before-it-can-be-used-against-vendored-source-code/122648
 					"--locked",
 					// auto generated by `cargo vendor`
@@ -236,7 +228,7 @@ func main() {
 					assert(filepath.IsAbs(path))
 					assert(filepath.IsAbs(BIG_BANG_DATA_DIR))
 					if strings.HasPrefix(path, BIG_BANG_DATA_DIR) {
-                                                return
+						return
 					}
 				}
 				logger.Info().Begin("installing")
@@ -247,9 +239,9 @@ func main() {
 			},
 		},
 		{
-			Name:          "nvim",
-			Download_Link: "https://github.com/neovim/neovim/releases/download/v0.11.3/nvim-macos-arm64.tar.gz",
-			Checksum:      "17d22826f19fe28a11f9ab4bee13c43399fdcce485eabfa2bea6c5b3d660740f",
+			Name:                    "nvim",
+			Download_Link:           "https://github.com/neovim/neovim/releases/download/v0.11.3/nvim-macos-arm64.tar.gz",
+			Checksum:                "17d22826f19fe28a11f9ab4bee13c43399fdcce485eabfa2bea6c5b3d660740f",
 			Retain_Installation_Dir: true,
 		},
 		{
@@ -260,7 +252,7 @@ func main() {
 		{
 			Name:          "fd",
 			Download_Link: "https://github.com/sharkdp/fd/releases/download/v10.2.0/fd-v10.2.0-aarch64-apple-darwin.tar.gz",
-			Checksum:      "ae6327ba8c9a487cd63edd8bddd97da0207887a66d61e067dfe80c1430c5ae36", //manual
+			Checksum:      "ae6327ba8c9a487cd63edd8bddd97da0207887a66d61e067dfe80c1430c5ae36", // manual
 		},
 		{
 			Name:          "rg",
@@ -300,7 +292,7 @@ func main() {
 					assert(filepath.IsAbs(path))
 					assert(filepath.IsAbs(BIG_BANG_DATA_DIR))
 					if strings.HasPrefix(path, BIG_BANG_DATA_DIR) {
-                                                return
+						return
 					}
 				}
 				logger.Info().Begin("installing")
@@ -312,13 +304,12 @@ func main() {
 		},
 	}
 
-
 	type Info struct {
 		description string
 		action      func()
 	}
 	commands := map[string]Info{
-		"dotfiles_check": Info{
+		"dotfiles_check": {
 			description: "checks if actual dotfiles match those in big_bang/dotfiles",
 			action: func() {
 				files_set := mismatched_dotfiles(logger)
@@ -333,7 +324,7 @@ func main() {
 				}
 			},
 		},
-		"dotfiles_sync": Info{
+		"dotfiles_sync": {
 			description: "Synchronizes dotfiles from big_bang/dotfiles to $HOME by creating missing files or overwriting existing files. It will never delete other files.",
 			action: func() {
 				files := mismatched_dotfiles(logger)
@@ -345,7 +336,7 @@ func main() {
 				defer logger.Info().Done("syncing dotfiles")
 				for relative_path := range files {
 					assert(!filepath.IsAbs(relative_path))
-					var err_sync = func() error {
+					err_sync := func() error {
 						src := filepath.Join(big_bang_dotfiles_os_specific, relative_path)
 						if !file_exists(src) {
 							src = filepath.Join(big_bang_dotfiles_common, relative_path)
@@ -372,10 +363,10 @@ func main() {
 				}
 			},
 		},
-		"dependencies_download": Info{
+		"dependencies_download": {
 			description: "dependencies of which the binary can be downloaded directly will be saved in BIG_BANG_DATA_DIR/download",
 			action: func() {
-				total_ctx, total_cancel := context.WithTimeout(context.Background(), time.Minute * 15)
+				total_ctx, total_cancel := context.WithTimeout(context.Background(), time.Minute*15)
 				defer total_cancel()
 				var wg sync.WaitGroup
 				defer wg.Wait()
@@ -386,17 +377,17 @@ func main() {
 					wg.Add(1)
 					go func() {
 						defer wg.Done()
-						individual_ctx, individual_cancel := context.WithTimeout(total_ctx, time.Minute * 3)
+						individual_ctx, individual_cancel := context.WithTimeout(total_ctx, time.Minute*3)
 						defer individual_cancel()
 						download_artifact(individual_ctx, artifact, filepath.Join(BIG_BANG_DATA_DIR, "download"), logger)
 					}()
 				}
 			},
 		},
-		"dependencies_install":  Info{
+		"dependencies_install": {
 			description: "install all dependencies",
 			action: func() {
-				total_ctx, total_cancel := context.WithTimeout(context.Background(), time.Minute * 15)
+				total_ctx, total_cancel := context.WithTimeout(context.Background(), time.Minute*15)
 				defer total_cancel()
 				var wg sync.WaitGroup
 				defer wg.Wait()
@@ -404,8 +395,8 @@ func main() {
 					if artifact.Install != nil {
 						artifact.Install(logger.With_Str("artifact", artifact.Name))
 						continue
-					} 
-					assert(artifact.Download_Link != "", 
+					}
+					assert(artifact.Download_Link != "",
 						"artifacts without a custom install step means their binaries are downloaded directly",
 					)
 					if path := which(artifact.Name); strings.HasPrefix(path, BIG_BANG_DATA_DIR) {
@@ -414,7 +405,7 @@ func main() {
 					wg.Add(1)
 					go func() {
 						defer wg.Done()
-						individual_ctx, individual_cancel := context.WithTimeout(total_ctx, time.Minute * 3)
+						individual_ctx, individual_cancel := context.WithTimeout(total_ctx, time.Minute*3)
 						defer individual_cancel()
 						download_path := download_artifact(individual_ctx, artifact, BIG_BANG_TMP, logger)
 						if download_path == "" {
@@ -426,7 +417,7 @@ func main() {
 			},
 		},
 	}
-	var print_help = func() {
+	print_help := func() {
 		fmt.Println("big bang replicates NixOS reproducibility on my work machines (MacOS, Debian, NixOS).")
 		fmt.Println("")
 		fmt.Println("Command Overview:")
@@ -456,7 +447,6 @@ func main() {
 	}
 }
 
-
 // The returned file paths are relative to big_bang_dotfiles. Note that big_bang/dotfiles/<SUBDIR> is a mirror of the home directory.
 func mismatched_dotfiles(logger *Logger) (mismatched_files map[string]struct{}) {
 	defer func() {
@@ -471,8 +461,7 @@ func mismatched_dotfiles(logger *Logger) (mismatched_files map[string]struct{}) 
 	logger.Info().Begin("finding mismatches")
 	defer logger.Info().Done("finding mismatches")
 
-
-	var filepath_relative_child = func(base, target string) string {
+	filepath_relative_child := func(base, target string) string {
 		// filepath.Rel doesn't require target to be a child of base but for this script, that will never be the case.
 		assert(strings.HasPrefix(target, base))
 		assert(filepath.IsAbs(target))
@@ -482,16 +471,14 @@ func mismatched_dotfiles(logger *Logger) (mismatched_files map[string]struct{}) 
 		return rel
 	}
 
-
-	var swap_base_dir = func(old_target, old_base, new_base string) (new_target string) {
+	swap_base_dir := func(old_target, old_base, new_base string) (new_target string) {
 		assert(filepath.IsAbs(old_target))
 		assert(filepath.IsAbs(old_base))
 		assert(filepath.IsAbs(new_base))
 		old_target = filepath.Clean(old_target)
-		old_base   = filepath.Clean(old_base)
-		new_base   = filepath.Clean(new_base)
+		old_base = filepath.Clean(old_base)
+		new_base = filepath.Clean(new_base)
 		assert(strings.HasPrefix(old_target, old_base))
-
 
 		defer func() {
 			assert(filepath.IsAbs(new_target))
@@ -501,7 +488,6 @@ func mismatched_dotfiles(logger *Logger) (mismatched_files map[string]struct{}) 
 		return filepath.Join(new_base, target_relative_to_old_base)
 	}
 
-
 	mismatched_files = make(map[string]struct{})
 	working_directory := big_bang_dotfiles_os_specific
 	if error_find_mismatches := filepath.WalkDir(working_directory, func(src_path string, src fs.DirEntry, err error) error {
@@ -510,11 +496,11 @@ func mismatched_dotfiles(logger *Logger) (mismatched_files map[string]struct{}) 
 		}
 		if dir_exists(src_path) {
 			return nil
-		} 
+		}
 		dst_path := swap_base_dir(src_path, working_directory, HOME)
 		assert(strings.HasPrefix(dst_path, HOME))
 		if dir_exists(dst_path) {
-			return errors.New("expected file. got directory: "+dst_path)
+			return errors.New("expected file. got directory: " + dst_path)
 		}
 		if !file_contents_are_equal(src_path, dst_path) {
 			logger.Info().Str("file", dst_path).Str("actual", src_path).Msg("mismatch detected")
@@ -532,11 +518,11 @@ func mismatched_dotfiles(logger *Logger) (mismatched_files map[string]struct{}) 
 		}
 		if dir_exists(src_path) {
 			return nil
-		} 
+		}
 		dst_path := swap_base_dir(src_path, working_directory, HOME)
 		oss_path := swap_base_dir(src_path, working_directory, big_bang_dotfiles_os_specific)
 		if dir_exists(dst_path) {
-			return errors.New("expected file. got directory: "+dst_path)
+			return errors.New("expected file. got directory: " + dst_path)
 		}
 		if !file_exists(oss_path) && !file_contents_are_equal(src_path, dst_path) {
 			mismatched_files[filepath_relative_child(working_directory, src_path)] = struct{}{}
@@ -549,9 +535,8 @@ func mismatched_dotfiles(logger *Logger) (mismatched_files map[string]struct{}) 
 	return mismatched_files
 }
 
-
-// You must provide a context.WithTimeout() to set a hard limit on each transfer, which will be reset with every retry. 
-// The retries use an exponential backoff strategy, capped at 10 minutes. The provided ctx should have a parent context.WithTimeout() to establish a total 
+// You must provide a context.WithTimeout() to set a hard limit on each transfer, which will be reset with every retry.
+// The retries use an exponential backoff strategy, capped at 10 minutes. The provided ctx should have a parent context.WithTimeout() to establish a total
 // timeout, as this function will retry indefinitely.
 //
 // If the artifact download fails, the function will return an empty string.
@@ -565,27 +550,30 @@ func download_artifact(ctx context.Context, artifact Artifact, output_directory 
 	}
 	retry_event := logger.Warn()
 	first_iteration := true
-	for retry_delay_ns := time.Second * 2;; retry_delay_ns = min(retry_delay_ns * 2, time.Minute * 10) { 
+	for retry_delay_ns := time.Second * 2; ; retry_delay_ns = min(retry_delay_ns*2, time.Minute*10) {
 		if first_iteration {
 			select {
-				case <- ctx.Done(): return ""
-				default: first_iteration = false
+			case <-ctx.Done():
+				return ""
+			default:
+				first_iteration = false
 			}
 		} else {
-			retry_event.Number("retry_delay(s)", int64(retry_delay_ns / time.Second)).Msg("Retry artifact download")
+			retry_event.Number("retry_delay(s)", int64(retry_delay_ns/time.Second)).Msg("Retry artifact download")
 			retry_event = logger.Warn()
 			select {
-				case <- ctx.Done(): return ""
-				case <- time.After(retry_delay_ns): 
+			case <-ctx.Done():
+				return ""
+			case <-time.After(retry_delay_ns):
 			}
 		}
-		request,  err := http.NewRequestWithContext(ctx, http.MethodGet, artifact.Download_Link, nil)
-		if err != nil { 
+		request, err := http.NewRequestWithContext(ctx, http.MethodGet, artifact.Download_Link, nil)
+		if err != nil {
 			logger.Error(err).Msg("initializing http request")
 			return ""
 		}
 		response, err := http.DefaultClient.Do(request)
-		if err != nil { 
+		if err != nil {
 			retry_event.Err(err)
 			continue
 		}
@@ -597,7 +585,7 @@ func download_artifact(ctx context.Context, artifact Artifact, output_directory 
 		filename := func() string {
 			content_disposition := response.Header.Get("Content-Disposition")
 			content_disposition_parts := strings.Split(content_disposition, ";")
-			if len(content_disposition_parts) < 2 || content_disposition_parts[0] != "attachment"  {
+			if len(content_disposition_parts) < 2 || content_disposition_parts[0] != "attachment" {
 				return ""
 			}
 			// TODO: support `filename*=UTF-8`
@@ -636,13 +624,12 @@ func download_artifact(ctx context.Context, artifact Artifact, output_directory 
 			logger.Error().Str("checksum", actual_checksum).
 				Msg("unset checksum. copy the calculated checksum and set it in the source code then rerun the script")
 			return ""
-		}	
+		}
 		break
 	}
 	assert(filepath.IsAbs(download_path))
 	return download_path
 }
-
 
 func install_artifact(artifact Artifact, artifact_archive_path string, logger *Logger) (ok bool) {
 	assert(artifact.Name != "")
@@ -654,60 +641,64 @@ func install_artifact(artifact Artifact, artifact_archive_path string, logger *L
 	defer logger.Info().Done("installing")
 	artifact_filename := filepath.Base(artifact_archive_path)
 	switch {
-	default: 
+	default:
 		logger.Error().Str("file", artifact_filename).Msg("unsupported extension")
 		return false
 	case strings.HasSuffix(artifact_filename, ".tar.gz"), strings.HasSuffix(artifact_filename, ".tar.xz"):
 		var compression_flag string
 		switch {
-		case strings.HasSuffix(artifact_filename, ".gz"): compression_flag = "--gzip"
-		case strings.HasSuffix(artifact_filename, ".xz"): compression_flag = "--xz"
-		default: 
+		case strings.HasSuffix(artifact_filename, ".gz"):
+			compression_flag = "--gzip"
+		case strings.HasSuffix(artifact_filename, ".xz"):
+			compression_flag = "--xz"
+		default:
 			logger.Error().Str("file", artifact_filename).Msg("unsupported tar compresison")
 			return false
 		}
 		if err := execute("", nil,
-			"tar", 
-			"--extract",   compression_flag,
-			"--file",      artifact_archive_path,
+			"tar",
+			"--extract", compression_flag,
+			"--file", artifact_archive_path,
 			"--directory", filepath.Dir(artifact_archive_path),
 		); err != nil {
 			logger.Error(err).Msg("unpacking .xz file with external tool")
 			return false
 		}
 	case strings.HasSuffix(artifact_filename, ".zip"):
-		var unpacking_error = func() error {
+		unpacking_error := func() error {
 			artifact_archive_handle, err := os.Open(artifact_archive_path)
 			if err != nil {
 				return err
 			}
 			info, err := artifact_archive_handle.Stat()
-			if err != nil { 
-				return err 
+			if err != nil {
+				return err
 			}
 			zip_reader, err := zip.NewReader(artifact_archive_handle, info.Size())
-			if err != nil { 
-				return err 
+			if err != nil {
+				return err
 			}
 			for _, entry := range zip_reader.File {
 				if strings.Contains(entry.Name, "__MACOSX") {
 					continue
 				}
 				extraction_path := filepath.Join(filepath.Dir(artifact_archive_path), filepath.Clean(entry.Name))
-				if entry.FileInfo().IsDir() || filepath.Ext(entry.Name) == ".app" { 
-					if err := os.MkdirAll(extraction_path, 0755); err != nil { return err }
-					continue 
+				if entry.FileInfo().IsDir() || filepath.Ext(entry.Name) == ".app" {
+					if err := os.MkdirAll(extraction_path, 0755); err != nil {
+						return err
+					}
+					continue
 				} else {
-					src, err := entry.Open() 
-					if err != nil { 
+					src, err := entry.Open()
+					if err != nil {
 						return err
 					}
 					dst, err := os.Create(extraction_path)
-					if err != nil { 
+					if err != nil {
 						return err
 					}
-					if _, err := io.CopyN(dst, src, int64(entry.UncompressedSize64)); err != nil { 
-						return err 
+					if _, err := io.CopyN(dst, src, int64(entry.UncompressedSize64)); err != nil {
+						return err
 					}
 					src.Close()
 					dst.Close()
@@ -719,7 +710,6 @@ func install_artifact(artifact Artifact, artifact_archive_path string, logger *L
 			logger.Error(unpacking_error).Msg("unpacking zip file")
 		}
 	}
-
 
 	var find_file func(string, string) string
 	find_file = func(to_find, directory string) (found string) {
@@ -757,7 +747,7 @@ func install_artifact(artifact Artifact, artifact_archive_path string, logger *L
 		return ""
 	}
 	artifact_binary_destination := filepath.Join(BIG_BANG_BIN, artifact.Name)
-	if err := os.Remove(artifact_binary_destination); err != nil  && !errors.Is(err, fs.ErrNotExist) {
+	if err := os.Remove(artifact_binary_destination); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		logger.Error(err).Msg("making sure binary destination file doesn't exist yet")
 		return false
 	}
@@ -795,7 +785,6 @@ func install_artifact(artifact Artifact, artifact_archive_path string, logger *L
 	return true
 }
 
-
 func file_checksum(source_path string, logger *Logger) []byte {
 	assert(filepath.IsAbs(source_path))
 	source_handle, err := os.Open(source_path)
@@ -803,37 +792,34 @@ func file_checksum(source_path string, logger *Logger) []byte {
 		return nil
 	}
 	hasher := sha256.New()
-	if _, err := io.Copy(hasher, source_handle); err != nil { 
+	if _, err := io.Copy(hasher, source_handle); err != nil {
 		logger.Debug().Err(err).Msg("hashing file")
-		return nil 
+		return nil
 	}
 	return hasher.Sum(nil)
 }
 
-
-func os_remove_if_exists(file_path string) error { 
-	if err := os.Remove(file_path); !errors.Is(err, fs.ErrNotExist) { 
-		return err 
-	} 
+func os_remove_if_exists(file_path string) error {
+	if err := os.Remove(file_path); !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
 	return nil
 }
 
-
 type Artifact struct {
 	// the same as the executable name
-	Name              string
-	Download_Link     string
-	Checksum          string
+	Name          string
+	Download_Link string
+	Checksum      string
 	// If false, deletes BIG_BANG_DATA_DIR/<PROGRAM>/ after installation.
 	// Useful for self-contained executables with no other files unlike Golang with its stdlib or nvim with its runtime directories.
 	// Instead of symlinking the executable to BIG_BANG_BIN, it gets moved there instead.
 	Retain_Installation_Dir bool
 	// By default, Artifact binary paths must have BIG_BANG_DATA_DIR as a prefix. This is not the case for system-wide dependencies.
-	System_Wide             bool
+	System_Wide bool
 	// As much as possible, download artifact binaries directly. If not possible, then specify the custom installation procedure here.
-	Install	func(*Logger)
+	Install func(*Logger)
 }
-
 
 func assert(cond bool, message_and_args ...any) {
 	const (
@@ -845,9 +831,9 @@ func assert(cond bool, message_and_args ...any) {
 	}
 	msg := ""
 	if len(message_and_args) > 0 {
-                var is_string bool
+		var is_string bool
 		msg, is_string = message_and_args[0].(string)
-                if is_string {
+		if is_string {
 			if len(message_and_args) > 1 {
 				args := message_and_args[1:]
 				msg = fmt.Sprintf(msg, args...)
@@ -858,6 +844,7 @@ func assert(cond bool, message_and_args ...any) {
 	}
 	assert_location(cond, msg, stackframe_of_the_caller_of_this_func)
 }
+
 func assert_location(cond bool, message string, skip int) {
 	if !cond {
 		_, file, line, ok := runtime.Caller(skip + 1)
@@ -870,12 +857,11 @@ func assert_location(cond bool, message string, skip int) {
 	}
 }
 
-
 /*
 https://patorjk.com/software/taag/#p=display&v=0&f=ANSI%20Shadow&t=logger
 
 
-██╗      ██████╗  ██████╗  ██████╗ ███████╗██████╗ 
+██╗      ██████╗  ██████╗  ██████╗ ███████╗██████╗
 ██║     ██╔═══██╗██╔════╝ ██╔════╝ ██╔════╝██╔══██╗
 ██║     ██║   ██║██║  ███╗██║  ███╗█████╗  ██████╔╝
 ██║     ██║   ██║██║   ██║██║   ██║██╔══╝  ██╔══██╗
@@ -913,67 +899,107 @@ Design Decisions:
 	log entry.
 */
 
-
 // Not thread-safe by default.
 var Log_Writer io.Writer = os.Stdout
+
 const (
 	// These defaults cover most cases. Note that these buffers can still grow when the need arises, in which case, they don't get returned to the
 	// pool but are instead left for the garbage collector.
 	Log_Default_Buffer_Capacity = Log_Header_Capacity + Log_Context_Capacity + len("\n")
-	Log_Header_Capacity = 
-		Log_Time_Capacity    + len("|") +
-		Log_Level_Capacity   + len("|") +
+	Log_Header_Capacity         = Log_Time_Capacity + len("|") +
+		Log_Level_Capacity + len("|") +
 		Log_Message_Capacity + len("|")
 	Log_Time_Capacity    = len(time.RFC3339) - len("07:00") // hardcoded to always be in UTC
 	Log_Level_Capacity   = Log_Level_Word_Max_Length
 	Log_Message_Capacity = 100
 	Log_Context_Capacity = 400
 
-
 	Log_Level_Word_Max_Length = 5
-	Log_Level_Debug    = -10
-	Log_Level_Info     =   0
-	Log_Level_Warn     =  10
-	Log_Level_Error    =  20
-	Log_Level_Disabled =  50
-
+	Log_Level_Debug           = -10
+	Log_Level_Info            = 0
+	Log_Level_Warn            = 10
+	Log_Level_Error           = 20
+	Log_Level_Disabled        = 50
 
 	Log_Component_Separator = '|'
 )
+
 func New_Logger(level int) *Logger {
 	if level >= Log_Level_Disabled || Log_Writer == nil {
 		return nil
 	}
 	return &Logger{
-		Buffer: make([]byte, 0, Log_Context_Capacity / 2),
-		Level: level,
+		Buffer: make([]byte, 0, Log_Context_Capacity/2),
+		Level:  level,
 	}
 }
 
+func (logger *Logger) Debug() *Log_Event {
+	if logger == nil || logger.Level > Log_Level_Debug {
+		return nil
+	} else {
+		return init_log_event(logger, "DEBUG"+string(Log_Component_Separator))
+	}
+}
 
-func (logger *Logger) Debug() *Log_Event { if logger == nil || logger.Level > Log_Level_Debug { return nil } else { return init_log_event(logger, "DEBUG"+string(Log_Component_Separator)) } }
-func (logger *Logger) Info()  *Log_Event { if logger == nil || logger.Level > Log_Level_Info  { return nil } else { return init_log_event(logger, "INFO "+string(Log_Component_Separator)) } }
-func (logger *Logger) Warn()  *Log_Event { if logger == nil || logger.Level > Log_Level_Warn  { return nil } else { return init_log_event(logger, "WARN "+string(Log_Component_Separator)) } }
+func (logger *Logger) Info() *Log_Event {
+	if logger == nil || logger.Level > Log_Level_Info {
+		return nil
+	} else {
+		return init_log_event(logger, "INFO "+string(Log_Component_Separator))
+	}
+}
+
+func (logger *Logger) Warn() *Log_Event {
+	if logger == nil || logger.Level > Log_Level_Warn {
+		return nil
+	} else {
+		return init_log_event(logger, "WARN "+string(Log_Component_Separator))
+	}
+}
+
 // The errs parameter is merely for convenience. One benefit of it also is that the error is ensured to be the first key value pair in the context unless the
 // parent logger already holds context to be inherited.
-func (logger *Logger) Error(errs ...error) *Log_Event { 
-	if logger == nil || logger.Level > Log_Level_Error { return nil } 
-	event := init_log_event(logger, "ERROR ") 
+func (logger *Logger) Error(errs ...error) *Log_Event {
+	if logger == nil || logger.Level > Log_Level_Error {
+		return nil
+	}
+	event := init_log_event(logger, "ERROR ")
 	switch len(errs) {
-	case 0:  noop()
-	case 1:  event = event.Err(errs[0])
-	default: event = event.Errs(errs...)
+	case 0:
+		noop()
+	case 1:
+		event = event.Err(errs[0])
+	default:
+		event = event.Errs(errs...)
 	}
 	return event
 }
 
+func (logger *Logger) With_Str(key, val string) *Logger {
+	if logger == nil {
+		return nil
+	}
+	return logger.With_Data(key, val)
+}
 
-func (logger *Logger) With_Str (key string, val string) *Logger { if logger == nil { return nil }; return logger.With_Data(key, val         ) }
-func (logger *Logger) With_Err (key string, val error ) *Logger { if logger == nil { return nil }; return logger.With_Data(key, val.Error() ) }
-func (logger *Logger) With_Int (key string, val int   ) *Logger { if logger == nil { return nil }; return logger.With_Data(key, strconv.Itoa(val)  ) }
-func (logger *Logger) With_Bool(key string, cond bool ) *Logger { 
-	if logger == nil { 
-		return nil 
+func (logger *Logger) With_Err(key string, val error) *Logger {
+	if logger == nil {
+		return nil
+	}
+	return logger.With_Data(key, val.Error())
+}
+
+func (logger *Logger) With_Int(key string, val int) *Logger {
+	if logger == nil {
+		return nil
+	}
+	return logger.With_Data(key, strconv.Itoa(val))
+}
+
+func (logger *Logger) With_Bool(key string, cond bool) *Logger {
+	if logger == nil {
+		return nil
 	}
 	val := "false"
 	if cond {
@@ -981,10 +1007,11 @@ func (logger *Logger) With_Bool(key string, cond bool ) *Logger {
 	}
 	return logger.With_Data(key, val)
 }
-func (logger *Logger) With_Data(key string, val string) *Logger { 
-	if logger == nil { 
-		return nil 
-	} 
+
+func (logger *Logger) With_Data(key, val string) *Logger {
+	if logger == nil {
+		return nil
+	}
 	dst := New_Logger(logger.Level)
 	copy(dst.Buffer, logger.Buffer)
 	append_and_escape(&dst.Buffer, key)
@@ -994,44 +1021,58 @@ func (logger *Logger) With_Data(key string, val string) *Logger {
 	return dst
 }
 
+func (event *Log_Event) Msg(msg string) {
+	if event == nil {
+		return
+	}
+	event.Message(msg).Send()
+}
 
-func (event *Log_Event) Msg  (msg string) { if event == nil { return }; event.Message(msg).Send() }
 // Simply convenience functions to help guide your message. With these prefixes, you'd want to start with verbs in the present-progressive form.
 // I recommend not using these like tracing logs. Only call Done() if an operation completes successfully. Otherwise, you probably have some WARN/ERROR log
 // outputted right beforehand, making it redundant. (And if something failed without any logs, you know what to do)
-func (event *Log_Event) Begin(msg string) { if event == nil { return }; event.Msg("begin "+msg) }
-func (event *Log_Event) Done (msg string) { if event == nil { return }; event.Msg("done  "+msg) }
+func (event *Log_Event) Begin(msg string) {
+	if event == nil {
+		return
+	}
+	event.Msg("begin " + msg)
+}
 
+func (event *Log_Event) Done(msg string) {
+	if event == nil {
+		return
+	}
+	event.Msg("done  " + msg)
+}
 
 // func (event *Log_Event) Bytes (key string, val string) *Log_Event { if event == nil { return nil }; return event.Data_Quoted(key, val) }
-func (event *Log_Event) Str (key string, val string) *Log_Event { 
-	if event == nil { 
-		return nil 
+func (event *Log_Event) Str(key, val string) *Log_Event {
+	if event == nil {
+		return nil
 	}
-	return event.Data(key, val) 
+	return event.Data(key, val)
 }
 
-
-func (event *Log_Event) Err (err error ) *Log_Event { 
-	if event == nil { 
-		return nil 
-	} 
-	err_str := "nil" 
-	if err != nil { 
-		err_str = err.Error() 
-	} 
-	return event.Data("error", err_str) 
+func (event *Log_Event) Err(err error) *Log_Event {
+	if event == nil {
+		return nil
+	}
+	err_str := "nil"
+	if err != nil {
+		err_str = err.Error()
+	}
+	return event.Data("error", err_str)
 }
 
-
-func (event *Log_Event) Errs(vals ...error) *Log_Event { 
-	if event == nil || len(vals) == 0  { return nil }
+func (event *Log_Event) Errs(vals ...error) *Log_Event {
+	if event == nil || len(vals) == 0 {
+		return nil
+	}
 	for _, v := range vals {
 		event = event.Data("error", v.Error())
 	}
 	return event
 }
-
 
 func (event *Log_Event) List(key string, vals ...string) *Log_Event {
 	if event == nil {
@@ -1043,19 +1084,72 @@ func (event *Log_Event) List(key string, vals ...string) *Log_Event {
 	return event
 }
 
+func (event *Log_Event) Int(key string, val int) *Log_Event {
+	if event == nil {
+		return nil
+	}
+	return event.Number(key, int64(val))
+}
 
-func (event *Log_Event) Int   (key string, val int    ) *Log_Event { if event == nil { return nil }; return event.Number(key,  int64(val)) }
-func (event *Log_Event) Int8  (key string, val int8   ) *Log_Event { if event == nil { return nil }; return event.Number(key,  int64(val)) }
-func (event *Log_Event) Int16 (key string, val int16  ) *Log_Event { if event == nil { return nil }; return event.Number(key,  int64(val)) }
-func (event *Log_Event) Int32 (key string, val int32  ) *Log_Event { if event == nil { return nil }; return event.Number(key,  int64(val)) }
-func (event *Log_Event) Int64 (key string, val int64  ) *Log_Event { if event == nil { return nil }; return event.Number(key,  int64(val)) }
-func (event *Log_Event) Uint  (key string, val uint   ) *Log_Event { if event == nil { return nil }; return event.Uint64(key, uint64(val)) }
-func (event *Log_Event) Uint8 (key string, val uint8  ) *Log_Event { if event == nil { return nil }; return event.Number(key,  int64(val)) }
-func (event *Log_Event) Uint16(key string, val uint16 ) *Log_Event { if event == nil { return nil }; return event.Number(key,  int64(val)) }
-func (event *Log_Event) Uint32(key string, val uint32 ) *Log_Event { if event == nil { return nil }; return event.Number(key,  int64(val)) }
-func (event *Log_Event) Uint64(key string, val uint64 ) *Log_Event { 
-	if event == nil { 
-		return nil 
+func (event *Log_Event) Int8(key string, val int8) *Log_Event {
+	if event == nil {
+		return nil
+	}
+	return event.Number(key, int64(val))
+}
+
+func (event *Log_Event) Int16(key string, val int16) *Log_Event {
+	if event == nil {
+		return nil
+	}
+	return event.Number(key, int64(val))
+}
+
+func (event *Log_Event) Int32(key string, val int32) *Log_Event {
+	if event == nil {
+		return nil
+	}
+	return event.Number(key, int64(val))
+}
+
+func (event *Log_Event) Int64(key string, val int64) *Log_Event {
+	if event == nil {
+		return nil
+	}
+	return event.Number(key, int64(val))
+}
+
+func (event *Log_Event) Uint(key string, val uint) *Log_Event {
+	if event == nil {
+		return nil
+	}
+	return event.Uint64(key, uint64(val))
+}
+
+func (event *Log_Event) Uint8(key string, val uint8) *Log_Event {
+	if event == nil {
+		return nil
+	}
+	return event.Number(key, int64(val))
+}
+
+func (event *Log_Event) Uint16(key string, val uint16) *Log_Event {
+	if event == nil {
+		return nil
+	}
+	return event.Number(key, int64(val))
+}
+
+func (event *Log_Event) Uint32(key string, val uint32) *Log_Event {
+	if event == nil {
+		return nil
+	}
+	return event.Number(key, int64(val))
+}
+
+func (event *Log_Event) Uint64(key string, val uint64) *Log_Event {
+	if event == nil {
+		return nil
 	}
 	append_and_escape(&event.Buffer, key)
 	event.Buffer = append(event.Buffer, '=')
@@ -1063,9 +1157,10 @@ func (event *Log_Event) Uint64(key string, val uint64 ) *Log_Event {
 	event.Buffer = append(event.Buffer, Log_Component_Separator)
 	return event
 }
-func (event *Log_Event) Number(key string, val int64 ) *Log_Event { 
-	if event == nil { 
-		return nil 
+
+func (event *Log_Event) Number(key string, val int64) *Log_Event {
+	if event == nil {
+		return nil
 	}
 	append_and_escape(&event.Buffer, key)
 	event.Buffer = append(event.Buffer, '=')
@@ -1073,9 +1168,10 @@ func (event *Log_Event) Number(key string, val int64 ) *Log_Event {
 	event.Buffer = append(event.Buffer, Log_Component_Separator)
 	return event
 }
-func (event *Log_Event) Bool(key string, cond bool) *Log_Event { 
-	if event == nil { 
-		return nil 
+
+func (event *Log_Event) Bool(key string, cond bool) *Log_Event {
+	if event == nil {
+		return nil
 	}
 	val := "false"
 	if cond {
@@ -1083,6 +1179,7 @@ func (event *Log_Event) Bool(key string, cond bool) *Log_Event {
 	}
 	return event.Data(key, val)
 }
+
 func (event *Log_Event) Data(key, val string) *Log_Event {
 	if event == nil {
 		return nil
@@ -1094,18 +1191,17 @@ func (event *Log_Event) Data(key, val string) *Log_Event {
 	return event
 }
 
-
-// Message is meant to be a short summary of your log entry, similar to a git commit message. 
+// Message is meant to be a short summary of your log entry, similar to a git commit message.
 // If msg is longer than 100 characters, it gets truncated with the indicator "...".
 func (event *Log_Event) Message(msg string) *Log_Event {
 	if event == nil {
 		return nil
 	}
 	start := Log_Time_Capacity + len(" ") + Log_Level_Capacity + len(" ")
-	end   := start + Log_Message_Capacity
-	assert(end - start < len(event.Buffer), "length should've been unsafely set past the empty message sub buffer during the log event initialization")
+	end := start + Log_Message_Capacity
+	assert(end-start < len(event.Buffer), "length should've been unsafely set past the empty message sub buffer during the log event initialization")
 	message_buffer := event.Buffer[start:end]
-	if len(msg) <= Log_Message_Capacity { 
+	if len(msg) <= Log_Message_Capacity {
 		for offset := range msg {
 			message_buffer[offset] = msg[offset]
 		}
@@ -1114,8 +1210,8 @@ func (event *Log_Event) Message(msg string) *Log_Event {
 		}
 	} else {
 		placeholder := "..."
-		before := message_buffer[:len(message_buffer) - len(placeholder) ]
-		after  := message_buffer[ len(message_buffer) - len(placeholder):]
+		before := message_buffer[:len(message_buffer)-len(placeholder)]
+		after := message_buffer[len(message_buffer)-len(placeholder):]
 		for offset := range before {
 			before[offset] = msg[offset]
 		}
@@ -1125,7 +1221,6 @@ func (event *Log_Event) Message(msg string) *Log_Event {
 	}
 	return event
 }
-
 
 func (event *Log_Event) Send() {
 	if event == nil {
@@ -1137,16 +1232,14 @@ func (event *Log_Event) Send() {
 		os.Stderr.Write(string_to_bytes("WRITE_ERROR|could not write log event"))
 	}
 
-
 	// assert after writing to make it more convenient to see what event.Buffer contained
-	after_time_index    := Log_Time_Capacity + 1
-	after_level_index   := after_time_index  + Log_Level_Capacity + 1
+	after_time_index := Log_Time_Capacity + 1
+	after_level_index := after_time_index + Log_Level_Capacity + 1
 	after_message_index := after_level_index + Log_Message_Capacity + 1
 
-
-	assert(event.Buffer[after_time_index    - 1 ] == Log_Component_Separator, "missing separator after time component")
-	assert(event.Buffer[after_level_index   - 1 ] == Log_Component_Separator, "missing separator after level component")
-	assert(event.Buffer[after_message_index - 1 ] == Log_Component_Separator, "missing separator after message component")
+	assert(event.Buffer[after_time_index-1] == Log_Component_Separator, "missing separator after time component")
+	assert(event.Buffer[after_level_index-1] == Log_Component_Separator, "missing separator after level component")
+	assert(event.Buffer[after_message_index-1] == Log_Component_Separator, "missing separator after message component")
 	assert(func() bool {
 		for offset := range event.Buffer {
 			if event.Buffer[offset] == 0 {
@@ -1157,14 +1250,12 @@ func (event *Log_Event) Send() {
 	}(), "final log event does not contain null bytes")
 }
 
-
 func init_log_event(logger *Logger, log_level_str string) *Log_Event {
 	if logger == nil {
 		return nil
 	}
 	event := Log_Event_Pool.Get().(*Log_Event)
 	event.Buffer = event.Buffer[:0]
-
 
 	append_zero_padded_int := func(buf []byte, v int) []byte {
 		if v < 10 {
@@ -1188,20 +1279,17 @@ func init_log_event(logger *Logger, log_level_str string) *Log_Event {
 	event.Buffer = append_zero_padded_int(event.Buffer, t.Second())
 	event.Buffer = append(event.Buffer, 'Z', Log_Component_Separator)
 
-
-	assert(len(log_level_str) == Log_Level_Word_Max_Length + len("|"))
+	assert(len(log_level_str) == Log_Level_Word_Max_Length+len("|"))
 	assert(strings.HasSuffix(log_level_str, string(Log_Component_Separator)))
 	event.Buffer = append(event.Buffer, string_to_bytes(log_level_str)...)
-
 
 	// Set the slice length past the Msg() portion, starting at the context.
 	element_size := int(unsafe.Sizeof(event.Buffer[0]))
 	previous := (*reflect.SliceHeader)(unsafe.Pointer(&event.Buffer))
-	current  := reflect.SliceHeader{
+	current := reflect.SliceHeader{
 		Data: previous.Data,
 		Cap:  previous.Cap, // doesn't matter because we must stay within the capacity
-		Len: 
-			(len(event.Buffer) + Log_Message_Capacity) * element_size,
+		Len:  (len(event.Buffer) + Log_Message_Capacity) * element_size,
 	}
 	event.Buffer = *(*[]byte)(unsafe.Pointer(&current))
 	assert(len(event.Buffer) <= cap(event.Buffer))
@@ -1211,7 +1299,6 @@ func init_log_event(logger *Logger, log_level_str string) *Log_Event {
 	return event
 }
 
-
 func deinit_log_event(event *Log_Event) {
 	if cap(event.Buffer) > Log_Default_Buffer_Capacity {
 		return
@@ -1219,35 +1306,36 @@ func deinit_log_event(event *Log_Event) {
 	Log_Event_Pool.Put(event)
 }
 
-
 // Logger is a long-lived object that primarily holds context data to be inherited by all of its child Log_Events.
 // All of Logger's methods that append to the context buffer create a new copy of Logger.
 type Logger struct {
 	// To be inherited by a Log_Event created by its methods.
-	Buffer     []byte
-	Level      int
+	Buffer []byte
+	Level  int
 }
-// Log_Event is a transient object that should not be touched after writing to Log_Writer. Minimize scope as much as possible, usually in one statement. 
-// If you find yourself passing this as a function parameter, embed that context in the Logger instead. 
+
+// Log_Event is a transient object that should not be touched after writing to Log_Writer. Minimize scope as much as possible, usually in one statement.
+// If you find yourself passing this as a function parameter, embed that context in the Logger instead.
 // Log_Event methods modify the Log_Event itself through a pointer receiver.
-type  Log_Event struct {
+type Log_Event struct {
 	Buffer []byte
 	// The log level is intentionally omitted from Log_Event.
 	// Logger.<Level>() methods return nil if the event should not be logged, allowing method chains like logger.Info().Str("key", "val").Msg("msg") to
 	// no-op safely. This design eliminates the need to check the log level inside Log_Event itself.
 }
+
 var Log_Event_Pool = &sync.Pool{
-	New: func() any { 
+	New: func() any {
 		return &Log_Event{
 			Buffer: make([]byte, 0, Log_Default_Buffer_Capacity),
-		} 
+		}
 	},
 }
-
 
 func string_to_bytes(s string) []byte {
 	return unsafe.Slice(unsafe.StringData(s), len(s))
 }
+
 func append_and_escape(dst *[]byte, src string) {
 	for offset := 0; offset < len(src); offset += 1 {
 		ch := src[offset]
@@ -1257,7 +1345,6 @@ func append_and_escape(dst *[]byte, src string) {
 		*dst = append(*dst, ch)
 	}
 }
-
 
 /* https://patorjk.com/software/taag/#p=display&v=0&f=ANSI%20Shadow&t=coreutils
 
@@ -1272,7 +1359,6 @@ func append_and_escape(dst *[]byte, src string) {
 
 */
 
-
 func execute(working_directory string, environment []string, binary string, arguments ...string) error {
 	cmd := exec.Command(binary, arguments...)
 	if len(environment) > 0 {
@@ -1286,21 +1372,19 @@ func execute(working_directory string, environment []string, binary string, argu
 	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Stdin  = os.Stdin
+	cmd.Stdin = os.Stdin
 	return cmd.Run()
 }
-
 
 func which(name string) (path string) {
 	path_raw, err := exec.Command("command", "-v", name).Output()
 	if err != nil {
 		return ""
 	}
-        path = filepath.Clean(string(path_raw))
+	path = filepath.Clean(string(path_raw))
 	assert(filepath.IsAbs(path))
 	return path
 }
-
 
 func file_contents_are_equal(a, b string) bool {
 	assert(filepath.IsAbs(a))
@@ -1329,7 +1413,6 @@ func file_contents_are_equal(a, b string) bool {
 	}
 }
 
-
 func is_dir(path string) bool { return dir_exists(path) }
 func dir_exists(path string) bool {
 	info, err := os.Lstat(path)
@@ -1339,12 +1422,10 @@ func dir_exists(path string) bool {
 	return info.IsDir()
 }
 
-
 func file_exists(path string) bool {
 	info, err := os.Lstat(path)
 	return err == nil && !info.IsDir()
 }
-
 
 // no operation function used for explicitness
 func noop(_ ...string) {}
