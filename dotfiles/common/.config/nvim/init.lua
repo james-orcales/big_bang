@@ -21,7 +21,6 @@ vim.api.nvim_set_hl(0, "YankSystemClipboard", { bg = "#0000FF", fg = "#000000" }
 vim.diagnostic.config({ virtual_lines = { current_line = true } })
 -- stylua: ignore end
 
-
 -- === Options ===
 vim.opt.laststatus = 3
 vim.opt.statusline = "%<%{expand('%:~')}(%(%l:%v%))"
@@ -32,65 +31,49 @@ vim.opt.statusline = "%<%{expand('%:~')}(%(%l:%v%))"
         .. " %q"
         .. " %P"
 
-
 vim.opt.smartcase = true
 vim.opt.ignorecase = true
 
-
 vim.opt.number = true
 vim.opt.relativenumber = true
-
 
 vim.opt.tabstop = 8
 vim.opt.softtabstop = 8
 vim.opt.shiftwidth = 8
 vim.opt.expandtab = true
 
-
 vim.opt.smartindent = true
 
-
 vim.opt.wrap = false
-
 
 vim.opt.swapfile = false
 vim.opt.backup = false
 vim.opt.undodir = os.getenv("HOME") .. "/.local/share/nvim/undodir"
 vim.opt.undofile = true
 
-
 vim.opt.hlsearch = false
 vim.opt.incsearch = true
 
-
 vim.opt.termguicolors = true
-
 
 vim.opt.scrolloff = 1
 
-
 vim.opt.signcolumn = "yes"
-
 
 vim.opt.isfname:append("@-@")
 
-
 vim.opt.updatetime = 750
-
 
 vim.opt.colorcolumn = "160"
 vim.opt.textwidth = 160
 vim.opt.wrapmargin = 1
 vim.opt.formatoptions:append("t")
 
-
 vim.opt.completeopt = { "menu", "menuone", "noselect" }
 vim.opt.fillchars = { eob = " " }
 
-
 -- === Keymap ===
 vim.g.mapleader = " "
-
 
 local os = vim.uv.os_uname().sysname
 local xplat_set = vim.keymap.set
@@ -122,36 +105,29 @@ xplat_set({ "i", "c"           }, "<C-H>",      "<C-W>",             { desc = "K
 xplat_set({ "i", "c"           }, "<C-BS>",     "<C-W>",             { desc = "Kill word before cursor"                                })
 -- stylua: ignore end
 
-
 -- Open File Explorer
 xplat_set("n", "-", vim.cmd.Ex)
-
 
 -- Move selection in visual mode
 xplat_set("v", "<C-Down>", ":m '>+1<CR>gv=gv")
 xplat_set("v", "<C-Up>", ":m '<-2<CR>gv=gv")
 vim.keymap.set({ "n", "i" }, "<C-E>", "<ESC>:w<CR>", { desc = "Save File" })
 
-
 -- Center screen on search result
 xplat_set("n", "n", "nzzzv")
 xplat_set("n", "N", "Nzzzv")
-
 
 -- Quickfix
 xplat_set("n", "{", "<CMD>:cprevious<CR>")
 xplat_set("n", "}", "<CMD>:cnext<CR>")
 
-
 xplat_set("n", "H", "<nop>")
-
 
 -- Saving my right pinky
 xplat_set("n", "w", "o", { noremap = true, desc = "Remap o to w" })
 xplat_set("n", "W", "O", { noremap = true, desc = "Remap O to W" })
 xplat_set("n", "o", "", { noremap = true, desc = "Remap o to w" })
 xplat_set("n", "O", "", { noremap = true, desc = "Remap O to W" })
-
 
 -- Escape in insert mode
 -- <C-c> is remapped to <Esc> so that exiting insert mode behaves consistently.
@@ -160,30 +136,43 @@ xplat_set("n", "O", "", { noremap = true, desc = "Remap O to W" })
 -- Without this mapping, using <C-c> instead of <Esc> will cancel the block operation.
 vim.keymap.set("i", "<C-c>", "<Esc>")
 
-
 -- Delete without affecting default register
 xplat_set("v", "D", [["_d]])
 
-
 -- Global case-INsensitive search and replace, matching the word under cursor, without confirmation
-xplat_set("n", "sr", [[:%s/\<<C-r><C-w>\>/<C-r><C-w>/gI<Left><Left><Left>]])
+xplat_set("n", "sr", [[:%s/<C-r><C-w>/<C-r><C-w>/gI<Left><Left><Left>]])
 -- Visual mode case-sensitive search and replace
-xplat_set("v", "sr", [[:s///gc<Left><Left><Left><Left>]])
-
+xplat_set("v", "sr", [[:s///g<Left><Left><Left>]])
 
 -- Extend gs to 100ms. Useful in macros involving lsp go-to-definition which has a little delay.
 xplat_set("n", "gs", "<cmd>sleep 100m<CR>")
 
-
 vim.keymap.set({ "n", "v" }, "<C-Y>", [["+y]], { desc = "Yank to system clipboard" })
 vim.keymap.set("n", "<C-Y><C-Y>", [["+yy]], { desc = "Yank line to system clipboard" })
-
 
 -- Add character to end of line
 xplat_set("n", ",", "mzA,<ESC>`z")
 
+vim.keymap.set({ "v", "x" }, "gW", function()
+        local original_tw = vim.opt_local.textwidth:get()
+        vim.opt_local.textwidth = 100
+        vim.cmd("normal! gw")
+        vim.opt_local.textwidth = original_tw
+end, { desc = "Temporarily wrap selection to 100 columns" })
 
 -- === Autocmd ===
+vim.api.nvim_create_autocmd({ "BufWinEnter" }, {
+        desc = "Set makeprg",
+        group = vim.api.nvim_create_augroup("statusline-git-branch", { clear = true }),
+        callback = function(ev)
+                local ft = vim.bo[ev.buf].filetype
+                if ft == "odin" then
+                        vim.opt.makeprg = "vendor/Odin/odin check"
+                elseif ft == "go" then
+                        vim.opt.makeprg = "go test"
+                end
+        end,
+})
 vim.api.nvim_create_autocmd({ "BufWinEnter" }, {
         desc = "Get git branch of opened buffer for statusline",
         group = vim.api.nvim_create_augroup("statusline-git-branch", { clear = true }),
@@ -197,7 +186,6 @@ vim.api.nvim_create_autocmd({ "BufWinEnter" }, {
                 vim.b.git_branch = #branch > 0 and string.format("git:(%s)", branch) or ""
         end,
 })
-
 
 vim.api.nvim_create_autocmd("TextYankPost", {
         desc = "Highlight when yanking text",
@@ -213,11 +201,9 @@ vim.api.nvim_create_autocmd("TextYankPost", {
         end,
 })
 
-
-local format_on_save_group = vim.api.nvim_create_augroup("format_on_save", { clear = true })
 vim.api.nvim_create_autocmd({ "BufWritePre" }, {
         desc = "Format on save",
-        group = format_on_save_group,
+        group = vim.api.nvim_create_augroup("format_on_save", { clear = true }),
         pattern = { "*.go", "*.lua", "*.py", "*.rs" },
         callback = function(ev)
                 local lines = vim.api.nvim_buf_get_lines(ev.buf, 0, -1, false)
@@ -246,46 +232,54 @@ vim.api.nvim_create_autocmd({ "BufWritePre" }, {
 })
 -- Automatically formats files on save by normalizing blank lines:
 --     any run of one or more blank lines becomes exactly two blank lines.
-vim.api.nvim_create_autocmd({ "BufWritePre" }, {
-        desc = "Format on save",
-        group = format_on_save_group,
-        pattern = { "*.odin", "*.sh", "*.lua" },
-        callback = function(ev)
-                -- NOTE: I tried Ex commands with regex at first. The problem was that when undoing, the cursor would
-                -- jump to the top of the file.
-                --
-                -- local pos = vim.api.nvim_win_get_cursor(0)
-                -- -- https://vim.fandom.com/wiki/Regex_lookahead_and_lookbehind
-                -- vim.cmd([[:%s/^\s*\n\{1,}/\r\r]])
-                -- vim.api.nvim_win_set_cursor(0, pos)
-                local lines = vim.api.nvim_buf_get_lines(ev.buf, 0, -1, false)
-                local new_lines = {}
-                local blank_streak = 0
-                for _, line in ipairs(lines) do
-                        if line:match("^%s*$") then
-                                blank_streak = blank_streak + 1
-                        else
-                                if blank_streak > 0 then
-                                        table.insert(new_lines, "")
-                                        table.insert(new_lines, "")
-                                        blank_streak = 0
-                                end
-                                table.insert(new_lines, line)
-                        end
-                end
-                vim.api.nvim_buf_set_lines(ev.buf, 0, -1, false, new_lines)
+-- vim.api.nvim_create_autocmd({ "BufWritePre" }, {
+--         desc = "Format on save",
+--         group = format_on_save_group,
+--         pattern = { "*.odin", "*.sh", "*.lua" },
+--         callback = function(ev)
+--                 -- NOTE: I tried Ex commands with regex at first. The problem was that when undoing, the cursor would
+--                 -- jump to the top of the file.
+--                 --
+--                 -- local pos = vim.api.nvim_win_get_cursor(0)
+--                 -- -- https://vim.fandom.com/wiki/Regex_lookahead_and_lookbehind
+--                 -- vim.cmd([[:%s/^\s*\n\{1,}/\r\r]])
+--                 -- vim.api.nvim_win_set_cursor(0, pos)
+--                 local lines = vim.api.nvim_buf_get_lines(ev.buf, 0, -1, false)
+--                 local new_lines = {}
+--                 local blank_streak = 0
+--                 for _, line in ipairs(lines) do
+--                         if line:match("^%s*$") then
+--                                 blank_streak = blank_streak + 1
+--                         else
+--                                 if blank_streak > 0 then
+--                                         table.insert(new_lines, "")
+--                                         table.insert(new_lines, "")
+--                                         blank_streak = 0
+--                                 end
+--                                 table.insert(new_lines, line)
+--                         end
+--                 end
+--                 vim.api.nvim_buf_set_lines(ev.buf, 0, -1, false, new_lines)
+--         end,
+-- })
+
+vim.api.nvim_create_autocmd("FileType", {
+        pattern = { "*" },
+        group = vim.api.nvim_create_augroup("shrink_text_width", { clear = true }),
+        callback = function()
+                local ft = vim.bo.filetype
+                local name = vim.fn.expand("%:t")
+                vim.wo.colorcolumn = (ft == "markdown" or name:match("^LICENSE.*")) and "100" or "160"
+                vim.bo.textwidth = (ft == "markdown" or name:match("^LICENSE.*")) and 100 or 160
         end,
 })
-
 
 -- === Dependencies ===
 require("mini/splitjoin").setup()
 
-
 -- vim-easy-align
 vim.g.easy_align_ignore_groups = {}
 vim.keymap.set("x", " ", "<Plug>(EasyAlign)")
-
 
 -- undotree
 vim.g.undotree_WindowLayout = 4
@@ -293,12 +287,10 @@ vim.g.undotree_shortIndicators = 1
 vim.g.undotree_SetFocusWhenToggle = 1
 vim.keymap.set("n", "<leader>ut", vim.cmd.UndotreeToggle)
 
-
 do
         local oil = require("oil")
         oil.setup({
                 -- default_file_explorer = true,
-                columns = { "icon" },
                 buf_options = { buflisted = false, bufhidden = "hide" },
                 win_options = {
                         wrap = false,
@@ -320,10 +312,10 @@ do
                         ["<C-End>"] = "G",
                         ["="] = function()
                                 if vim.g.oil_size_column == 1 then
-                                        oil.set_columns({ "icon" })
+                                        oil.set_columns({})
                                         vim.g.oil_size_column = 0
                                 else
-                                        oil.set_columns({ "icon", "size" })
+                                        oil.set_columns({ "size" })
                                         vim.g.oil_size_column = 1
                                 end
                         end,
@@ -335,7 +327,6 @@ do
         })
         vim.keymap.set({ "n" }, "-", oil.open)
 end
-
 
 require("nvim-surround").setup({
         surrounds = {
@@ -363,7 +354,6 @@ require("nvim-surround").setup({
         },
 })
 
-
 do
         local leap = require("leap")
         leap.opts.safe_labels = {}
@@ -372,10 +362,7 @@ do
         leap.opts.special_keys.next_group = "<space>"
         vim.keymap.set({ "n", "x", "o" }, "t", "<Plug>(leap)")
         vim.api.nvim_set_hl(0, "LeapBackdrop", { link = "Comment" })
-        -- vim.api.nvim_set_hl(0, "LeapLabelDimmed", { link = "" })
-        require("leap").init_hl(true)
 end
-
 
 do
         local fzf = require("fzf-lua")
@@ -502,7 +489,6 @@ do
                         },
                 })
         end
-
 
         vim.keymap.set("n", "<C-Space>", fzf.builtin)
         vim.keymap.set("n", "f<Space>", fzf.files)
