@@ -380,7 +380,7 @@ function install_golang()
                 return false
         end
         assert(sh("go version", "|"):match(version))
-        if not sh(string.format([[go env -w GOPATH=%s]], path(BIG_BANG_DATA_DIR, "/go-path"))) then
+        if not sh(string.format([[go env -w GOPATH=%s]], path(BIG_BANG_SHARE, "/go-path"))) then
                 ERROR("updating GOPATH")
                 return false
         end
