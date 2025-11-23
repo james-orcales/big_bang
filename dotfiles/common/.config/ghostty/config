@@ -1,5 +1,5 @@
 background          = 000
-theme               = rose-pine
+theme               = Rose Pine
 font-size           = 17
 window-height       = 9999
 window-width        = 9999
@@ -9,3 +9,4 @@ keybind = ctrl+left=esc:b
 keybind = ctrl+right=esc:f
 keybind = super+ctrl+alt+shift+n=next_tab
 keybind = super+ctrl+alt+shift+p=previous_tab
+keybind = ctrl+tab=ignore
