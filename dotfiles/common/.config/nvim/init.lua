@@ -161,21 +161,34 @@ vim.keymap.set({ "v", "x" }, "gW", function()
 end, { desc = "Temporarily wrap selection to 100 columns" })
 
 -- === Autocmd ===
-vim.api.nvim_create_autocmd({ "BufWinEnter" }, {
-        desc = "Set makeprg",
-        group = vim.api.nvim_create_augroup("statusline-git-branch", { clear = true }),
+
+--  Workflow is `:set mp=go\ test\ ./foo` -> `:mak`. This populates quickfix with errors.
+vim.api.nvim_create_autocmd({ "FileType" }, {
+        desc = "Set errorformat",
+        group = vim.api.nvim_create_augroup("set_errorformat", { clear = true }),
         callback = function(ev)
-                local ft = vim.bo[ev.buf].filetype
-                if ft == "odin" then
-                        vim.opt.makeprg = "vendor/Odin/odin check"
-                elseif ft == "go" then
-                        vim.opt.makeprg = "go test"
+                if ev.match == "odin" then
+                        vim.opt_local.errorformat = ",%f(%l:%v) %m"
+                elseif ev.match == "go" then
+                        vim.opt_local.errorformat = "%f:%l:%v: %m"
                 end
         end,
 })
+
+vim.api.nvim_create_autocmd({ "FileType" }, {
+        desc = "Language-specific macros",
+        group = vim.api.nvim_create_augroup("language_specific_macros", { clear = true }),
+        callback = function(ev)
+                if ev.match == "go" then
+                        vim.keymap.set("n", "en", "oif err != nil {<CR>}<ESC>O", { noremap = true, silent = true, buffer = ev.buf })
+                        vim.keymap.set("n", "EN", "Iif <ESC>mzaerr := <ESC>A; err != nil {<CR>}<ESC>`z", { noremap = true, silent = true, buffer = ev.buf })
+                end
+        end,
+})
+
 vim.api.nvim_create_autocmd({ "BufWinEnter" }, {
         desc = "Get git branch of opened buffer for statusline",
-        group = vim.api.nvim_create_augroup("statusline-git-branch", { clear = true }),
+        group = vim.api.nvim_create_augroup("statusline_git_branch", { clear = true }),
         callback = function()
                 local file_path = vim.fn.expand("%:p:h")
                 local prefix = "oil://"
