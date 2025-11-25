@@ -18,10 +18,12 @@ vim.api.nvim_set_hl(0, "StatusLine",  { bg = "#111111"            })
 vim.api.nvim_set_hl(0, "StatusLine",  { bg = "#111111"            })
 vim.api.nvim_set_hl(0, "TODO",        { fg = palette["red"]       })
 vim.api.nvim_set_hl(0, "YankSystemClipboard", { bg = "#0000FF", fg = "#000000" })
-vim.diagnostic.config({ virtual_lines = { current_line = true } })
+
+vim.api.nvim_set_hl(0, "rustCommentLineDoc",          { link = "Comment" })
 -- stylua: ignore end
 
 -- === Options ===
+vim.diagnostic.config({ virtual_lines = { current_line = true } })
 vim.opt.laststatus = 3
 vim.opt.statusline = "%<%{expand('%:~')}(%(%l:%v%))"
         .. " %{exists('b:git_branch') ? b:git_branch : ''}"
@@ -226,7 +228,8 @@ vim.api.nvim_create_autocmd({ "BufWritePre" }, {
                         cmd = { "stylua", "-" }
                 elseif ft == "go" then
                         cmd = { "gofumpt", "-extra" }
-                elseif ft == "rs" then
+                -- WHY THE FUCK WOULD NEOVIM IMPLICITLY rs -> rust
+                elseif ft == "rust" then
                         cmd = { "rustfmt" }
                 end
                 if cmd then
@@ -410,34 +413,69 @@ do
                         },
                 },
         })
+        local rules = {
+                Golang = {
+                        Function = [[^func +(?:\([a-zA-Z0-9_]+ +\*?[a-zA-Z0-9_]+\))? *[A-Z][a-zA-Z0-9_]* -- !*test* **.go]],
+                        Type = [[^type +[A-Z][a-zA-Z0-9_]+ -- !*test* **.go]],
+                },
+                Odin = {
+                        Function = [[^[a-zA-Z0-9_]+ +:: +proc -- !*test* **.odin]],
+                        Type = [[^\w+ +:: +(?:struct|union|enum|distinct) -- !*test* **.odin]],
+                },
+                Rust = {
+                        -- We don't filter by file extension because Rust API searches often target
+                        -- individual files, unlike Go or Odin, where the package system makes it
+                        -- more common to search the entire directory.
+                        Function_and_Macro = [[(^\s*pub fn (unsafe)? *[a-zA-Z0-9_#]+|^\s*macro_rules! [a-zA-Z0-9_#]+)]],
+                        Type = [[^\s*pub (?:struct|union|enum|trait|type) [a-zA-Z0-9_#]+]],
+                },
+        }
+        local parse_programming_language = function(path)
+                if path:match("%.go$") or path == "go.mod" then
+                        return "Golang"
+                elseif path:match("%.odin$") then
+                        return "Odin"
+                elseif path:match("%.rs$") or path == "cargo.toml" then
+                        return "Rust"
+                end
+                return nil
+        end
         local module_api_search = function()
-                programming_language = nil
-                local handle = vim.uv.fs_scandir(vim.uv.cwd())
-                if handle then
-                        while true do
-                                local name, t = vim.uv.fs_scandir_next(handle)
-                                if not name then
-                                        break
-                                end
-                                if t == "file" then
-                                        if name:match("%.go$") then
-                                                programming_language = "Golang"
+                local programming_language = nil
+                local operation = fzf.live_grep
+                local path = vim.api.nvim_buf_get_name(0)
+                if not path:match("^oil://.*") then
+                        programming_language = parse_programming_language(path)
+                        if programming_language == "Rust" then
+                                operation = fzf.lgrep_curbuf
+                        end
+                else
+                        local handle = vim.uv.fs_scandir(vim.uv.cwd())
+                        if handle then
+                                while true do
+                                        local name, t = vim.uv.fs_scandir_next(handle)
+                                        if not name then
                                                 break
-                                        elseif name:match("%.odin$") then
-                                                programming_language = "Odin"
-                                                break
-                                        elseif name:match("%.lua$") then
-                                                programming_language = "Lua"
-                                                break
+                                        end
+                                        if t == "file" then
+                                                programming_language = parse_programming_language(name)
+                                                if programming_language then
+                                                        break
+                                                end
                                         end
                                 end
                         end
                 end
                 if programming_language == nil then
-                        fzf.live_grep()
+                        operation()
                         return
                 end
-                local items = { "Function", "Type", "Variables", "_Function", "_Type", "Any" }
+                local items = {}
+                for item in pairs(rules[programming_language]) do
+                        table.insert(items, item)
+                end
+                table.sort(items)
+                table.insert(items, "Any")
                 fzf.fzf_exec(items, {
                         prompt = string.format("Search Package (%s) > ", programming_language),
                         actions = {
@@ -447,57 +485,21 @@ do
                                         end
                                         selected = selected[1]
                                         if selected == "Any" then
-                                                fzf.live_grep()
-                                                return
+                                                operation()
+                                        else
+                                                operation({
+                                                        search = rules[programming_language][selected],
+                                                        no_esc = true,
+                                                        -- Error: unable to init vim.regex
+                                                        -- https://github.com/ibhagwan/fzf-lua/issues/1858#issuecomment-2689899556
+                                                        -- The message is mostly informational, this happens due to the
+                                                        -- previewer trying to convert the regex to vim magic pattern (in
+                                                        -- order to highlight it), but not all cases can be covered so the
+                                                        -- previewer will highlight the cursor column only (instead of the
+                                                        -- entire pattern).
+                                                        silent = true,
+                                                })
                                         end
-                                        local pattern, ripgrep_options
-                                        if programming_language == "Golang" then
-                                                if selected == "Function" then
-                                                        local func = [[^func +]]
-                                                        local receiver = [[(?:\(\w+ +\*?\w+\))? *]] -- optional
-                                                        local identifier = [[[A-Z]\w+]]
-                                                        local generics = [[(?:\[.*?\])?]]
-                                                        local signature = [[\(.*?\) +]]
-                                                        pattern = func .. receiver .. identifier .. generics .. signature
-                                                elseif selected == "Type" then
-                                                        pattern = [[^type +[A-Z]\w* +]]
-                                                elseif selected == "Variables" then
-                                                        ripgrep_options = "--multiline"
-                                                        -- only matches file scope
-                                                        local single_line = [[^(?:var|const) +[A-Z]\w+]]
-                                                        local multiline = [[(?s)^(?:var|const) \(.*?^\)]]
-                                                        pattern = string.format("(?:%s|%s)", single_line, multiline)
-                                                elseif selected == "_Function" then
-                                                        pattern = [[^func +.*]]
-                                                elseif selected == "_Type" then
-                                                        pattern = [[^type +\w+ +]]
-                                                end
-                                                pattern = pattern .. " -- !*test*"
-                                        elseif programming_language == "Odin" then
-                                                if selected == "Function" then
-                                                        pattern = [[^\w+ +:: +proc]]
-                                                elseif selected == "Type" then
-                                                        pattern = [[^\w+ +:: +(?:struct|union|enum|distinct)]]
-                                                end
-                                                pattern = pattern .. " -- !*test*"
-                                        elseif programming_language == "Lua" then
-                                                if selected == "Function" then
-                                                        pattern = [[\w+ += +function\(|function +\w+\(|\w+ += +def\(]]
-                                                end
-                                        end
-                                        fzf.live_grep({
-                                                search = pattern,
-                                                rg_opts = ripgrep_options,
-                                                no_esc = true,
-                                                -- Error: unable to init vim.regex
-                                                -- https://github.com/ibhagwan/fzf-lua/issues/1858#issuecomment-2689899556
-                                                -- The message is mostly informational, this happens due to the
-                                                -- previewer trying to convert the regex to vim magic pattern (in
-                                                -- order to highlight it), but not all cases can be covered so the
-                                                -- previewer will highlight the cursor column only (instead of the
-                                                -- entire pattern).
-                                                silent = true,
-                                        })
                                 end,
                         },
                 })
