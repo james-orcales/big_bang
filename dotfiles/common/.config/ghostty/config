@@ -1,6 +1,7 @@
 background          = 000
 theme               = Rose Pine
-font-size           = 17
+font-size           = 18
+font-feature        = -calt,-liga,dlig
 window-height       = 9999
 window-width        = 9999
 macos-option-as-alt = true
