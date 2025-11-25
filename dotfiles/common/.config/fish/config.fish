@@ -10,6 +10,9 @@ if status is-interactive
         abbr --add gfb git clone --filter=blob:none 
         abbr --add --set-cursor=!! gmt git commit --allow-empty --message \"!!\"
 
+        abbr --add stdrs cd $(rustc --print sysroot)/lib/rustlib/src/rust/library/std/src
+        abbr --add stdgo cd $(go env GOROOT)
+
         abbr --add t zoxide_cd
 
         bind ctrl-space,c "fzf_cd $HOME/.config              && nvim ."             repaint
