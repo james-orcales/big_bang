@@ -20,7 +20,6 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
 
-
 assert(_VERSION == "Lua 5.1")
 
 
@@ -37,16 +36,13 @@ CARGO_HOME        = os.getenv("CARGO_HOME")
 RUSTUP_HOME       = os.getenv("RUSTUP_HOME")
 -- stylua: ignore end
 
-
 -- === HELPER FUNCTIONS ===
-
 
 function unreachable()
         local info = debug.getinfo(2)
         print(string.format("%s(%d): reached unreachable code", info.source, info.currentline))
         os.exit(1)
 end
-
 
 function unimplemented()
         local info = debug.getinfo(2)
@@ -61,7 +57,6 @@ function WARN(fmt,  ...) print(string.format("%s|WARN |" .. fmt, os.date("!%Y-%m
 function ERROR(fmt, ...) print(string.format("%s|ERROR|" .. fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
 function DEBUG(fmt, ...) print(string.format("%s|DEBUG|" .. fmt, os.date("!%Y-%m-%dT%H:%M:%SZ"), ...)) end
 -- stylua: ignore end
-
 
 CURRENT_PROCESS_ENVIRONMENT = (function()
         local env = {}
@@ -88,12 +83,10 @@ function os.getenv(key)
         return CURRENT_PROCESS_ENVIRONMENT[key]
 end
 
-
 -- Run shell commands with pipe or exec semantics
 function sh(...)
         local n = select("#", ...)
         assert(n > 0)
-
 
         local diff = {}
         for k, v in pairs(CURRENT_PROCESS_ENVIRONMENT) do
@@ -103,14 +96,12 @@ function sh(...)
         end
         local prefix = (#diff > 0) and table.concat(diff, " ") .. ";" or ""
 
-
         local args = { ... }
         local is_piped = args[n] == "|"
         if is_piped then
                 args[n] = nil
         end
         local command = prefix .. table.concat(args, " ")
-
 
         if is_piped then
                 local handle = io.popen(command)
@@ -121,7 +112,6 @@ function sh(...)
                 return os.execute(command) == 0
         end
 end
-
 
 -- sourcing implies numerous possible side effects. this only cares about env variables
 function source(filepath)
@@ -134,12 +124,10 @@ function source(filepath)
         end
 end
 
-
 function with_file(path, mode, fn, ...)
         assert(type(path) == "string" and path ~= "")
         assert(type(mode) == "string" and mode ~= "")
         assert(type(fn) == "function")
-
 
         local handle, open_err = io.open(path, mode)
         if not handle then
@@ -148,7 +136,6 @@ function with_file(path, mode, fn, ...)
         end
         local results = { pcall(fn, handle, ...) }
         handle:close()
-
 
         local ok = results[1]
         if not ok then
@@ -159,7 +146,6 @@ function with_file(path, mode, fn, ...)
         return true, unpack(results, 2)
 end
 
-
 function read_file(path)
         local _, content = with_file(path, "r", function(handle)
                 return handle:read("*a")
@@ -167,7 +153,6 @@ function read_file(path)
         assert(content == nil or type(content) == "string")
         return content
 end
-
 
 function write_file(path, content)
         assert(type(path) == "string" and path ~= "")
@@ -177,13 +162,11 @@ function write_file(path, content)
         end)
 end
 
-
 function string.has_prefix(str, prefix)
         assert(type(str) == "string")
         assert(type(prefix) == "string")
         return str:sub(1, #prefix) == prefix
 end
-
 
 function path(...)
         assert(type(HOME) == "string")
@@ -192,12 +175,9 @@ function path(...)
         return final
 end
 
-
 -- === END OF HELPER FUNCTIONS ====
 
-
 -- === PREREQUISITE ===
-
 
 operating_system = sh("uname", "|")
 cpu_architecture = sh("uname -m", "|")
@@ -221,9 +201,7 @@ assert(
         "Interactive shell is the default"
 )
 
-
 -- === END OF PREREQUISITES ===
-
 
 -- "Why are you hardcoding this here?"
 --      The shell config is essential to this bootstrapping so its better to keep its context inside this file.
@@ -300,7 +278,6 @@ SHELL_CONFIG = {
         },
 }
 
-
 function env_setup()
         INFO("Environment setup")
         if operating_system == "Darwin" then
@@ -325,14 +302,12 @@ function env_setup()
         return true
 end
 
-
 function install_golang()
         assert(type(operating_system) == "string" and operating_system ~= "")
         assert(type(cpu_architecture) == "string" and cpu_architecture ~= "")
         assert(type(BIG_BANG_DATA_DIR) == "string" and BIG_BANG_DATA_DIR ~= "")
         assert(type(BIG_BANG_SHARE) == "string" and BIG_BANG_SHARE ~= "")
         assert(type(BIG_BANG_TMP) == "string" and BIG_BANG_TMP ~= "")
-
 
         local version = "1.25.3"
         if sh("command -v go", "|"):has_prefix(BIG_BANG_DATA_DIR) then
@@ -343,7 +318,6 @@ function install_golang()
                         INFO("golang installation is the wrong version")
                 end
         end
-
 
         local release, checksum
         if operating_system == "Darwin" then
@@ -386,81 +360,6 @@ function install_golang()
         end
         return true
 end
-
-
-function install_cargo()
-        assert(type(BIG_BANG_DATA_DIR) == "string" and BIG_BANG_DATA_DIR ~= "")
-        assert(type(CARGO_HOME) == "string" and CARGO_HOME ~= "")
-        assert(type(RUSTUP_HOME) == "string" and RUSTUP_HOME ~= "")
-        if
-                sh("command -v cargo", "|"):has_prefix(BIG_BANG_DATA_DIR)
-                and sh("command -v rustup", "|"):has_prefix(BIG_BANG_DATA_DIR)
-                and sh("command -v rustc", "|"):has_prefix(BIG_BANG_DATA_DIR)
-        then
-                INFO("cargo, rustup, and rustc are already installed")
-                return true
-        else
-                if not CARGO_HOME:has_prefix(BIG_BANG_DATA_DIR) then
-                        ERROR("CARGO_HOME is not within BIG_BANG_DATA_DIR: got %s", CARGO_HOME)
-                        return false
-                end
-                if not RUSTUP_HOME:has_prefix(BIG_BANG_DATA_DIR) then
-                        ERROR("RUSTUP_HOME is not within BIG_BANG_DATA_DIR: got %s", RUSTUP_HOME)
-                        return false
-                end
-                INFO("installing cargo")
-                local ok = sh(
-                        "curl --proto '=https' --tlsv1.2 --silent --show-error --fail https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain=stable"
-                )
-                if ok then
-                        return true
-                else
-                        ERROR("installing cargo")
-                        return false
-                end
-        end
-        unreachable()
-end
-
-
-function install_homebrew()
-        if operating_system ~= "Darwin" then
-                return true
-        end
-        if sh("command -v brew > /dev/null") then
-                INFO("homebrew is already installed")
-                return true
-        end
-        INFO("installing homebrew")
-        assert(os.getenv("HOMEBREW_BUNDLE_FILE"))
-        write_file(
-                os.getenv("HOMEBREW_BUNDLE_FILE"),
-                [[
-cask "ghostty"
-cask "visual-studio-code"
-cask "firefox"
-cask "microsoft-edge"
-cask "cryptomator"
-cask "veracrypt"
-cask "obs"
-]]
-        )
-        if
-                not sh(
-                        [[NONINTERACTIVE=1 /bin/bash -c "$(curl --fail --silent --show-error --location https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"]]
-                )
-        then
-                ERROR("installing homebrew")
-                return false
-        end
-        if sh("brew bundle install") then
-                return true
-        else
-                ERROR("brew bundle install")
-                return false
-        end
-end
-
 
 -- SSH Keys
 -- https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent?platform=mac
@@ -509,82 +408,9 @@ github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+V
         unreachable()
 end
 
-
-function system_preferences()
-        if operating_system ~= "Darwin" then
-                unimplemented()
-        end
-        INFO("System preferences setup")
-        local ok = sh([[
-          defaults write com.apple.dock autohide               -bool   "true"
-          defaults write com.apple.dock autohide-delay         -float  0
-          defaults write com.apple.dock autohide-time-modifier -int    0
-          defaults write com.apple.dock "orientation"          -string "left"
-          defaults write com.apple.dock "show-recents"         -bool   "false"
-          killall Dock
-
-
-          defaults write com.apple.finder "AppleShowAllExtensions"  -bool   "true"
-          defaults write com.apple.finder "AppleShowAllFiles"       -bool   "true"
-          defaults write com.apple.finder "AppleShowScrollBars"     -bool   "true"
-          defaults write com.apple.finder "ShowPathbar"             -bool   "true"
-          defaults write com.apple.finder "ShowStatusBar"           -bool   "true"
-          defaults write com.apple.finder "NewWindowTarget"         -string "Home"
-          defaults write com.apple.finder "FXPreferredViewStyle"    -string "Nlsv"
-          defaults write com.apple.finder "FXDefaultSearchScope"    -string "SCcf"
-          defaults write com.apple.finder "_FXSortFoldersFirst"     -bool   "true"
-          defaults write com.apple.finder "_FXShowPosixPathInTitle" -bool   "true"
-          killall  Finder
-
-
-          defaults write com.apple.screensaver "askForPassword"      -int 1
-          defaults write com.apple.screensaver "askForPasswordDelay" -int 0
-
-
-          defaults write com.apple.AdLib "allowApplePersonalizedAdvertising" -bool "false"
-
-
-          # Avoid creating .DS_Store files on network or USB volumes
-          defaults write com.apple.desktopservices "DSDontWriteNetworkStores" -bool "true"
-          defaults write com.apple.desktopservices "DSDontWriteUSBStores"     -bool "true"
-
-
-          # Check for software updates daily, not just once per week
-          defaults write com.apple.SoftwareUpdate "AutomaticCheckEnabled" -bool "true"
-          defaults write com.apple.SoftwareUpdate "ScheduleFrequency"     -int  1
-          defaults write com.apple.SoftwareUpdate "AutomaticDownload"     -int  0
-          defaults write com.apple.SoftwareUpdate "CriticalUpdateInstall" -int  1
-
-
-          defaults write com.apple.menuextra.clock "DateFormat" -string "\"EEE MMM d HH:mm\""
-
-
-          defaults write NSGlobalDomain com.apple.mouse.linear                 -bool   "true"
-          defaults write NSGlobalDomain "WebKitDeveloperExtras"                -bool   "true"
-          defaults write NSGlobalDomain "AppleShowScrollBars"                  -string "always"
-          defaults write NSGlobalDomain "NSAutomaticCapitalizationEnabled"     -bool   "false"
-          defaults write NSGlobalDomain "NSAutomaticDashSubstitutionEnabled"   -bool   "false"
-          defaults write NSGlobalDomain "NSAutomaticInlinePredictionEnabled"   -bool   "false"
-          defaults write NSGlobalDomain "NSAutomaticPeriodSubstitutionEnabled" -bool   "false"
-          defaults write NSGlobalDomain "NSAutomaticQuoteSubstitutionEnabled"  -bool   "false"
-          defaults write NSGlobalDomain "NSAutomaticSpellingCorrectionEnabled" -bool   "false"
-]])
-        if ok then
-                return true
-        else
-                ERROR("Setting up system preferences")
-                return false
-        end
-        unreachable()
-end
-
-
 function main()
-        system_preferences()
         setup_ssh()
         assert(env_setup(), "Environment setup is essential")
-        install_homebrew()
-        install_cargo()
         if not install_golang() then
                 os.exit(1)
         end
@@ -592,6 +418,5 @@ function main()
         sh("go run big_bang.go dotfiles_sync")
         print("=== Bootstrap Finished ===")
 end
-
 
 main()
