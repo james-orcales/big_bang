@@ -74,6 +74,8 @@ vim.opt.formatoptions:append("t")
 vim.opt.completeopt = { "menu", "menuone", "noselect" }
 vim.opt.fillchars = { eob = " " }
 
+vim.opt.makeprg = ""
+
 -- === Keymap ===
 vim.g.mapleader = " "
 
@@ -113,17 +115,50 @@ xplat_set("n", "-", vim.cmd.Ex)
 -- Move selection in visual mode
 xplat_set("v", "<C-Down>", ":m '>+1<CR>gv=gv")
 xplat_set("v", "<C-Up>", ":m '<-2<CR>gv=gv")
-vim.keymap.set({ "v", "n", "i" }, "<C-E>", "<ESC>:w<CR>", { desc = "Save File" })
-vim.keymap.set({ "v", "n", "i" }, "<C-S>", "<ESC><CMD>:silent mak!<CR><CMD>:cope<CR><C-W><C-W>", { desc = "Save File" })
 
 -- Center screen on search result
 xplat_set("n", "n", "nzzzv")
 xplat_set("n", "N", "Nzzzv")
 
--- Quickfix
-xplat_set("n", "{", "<CMD>:cprevious<CR>")
-xplat_set("n", "}", "<CMD>:cnext<CR>")
+vim.keymap.set({ "v", "n", "i" }, "<C-E>", function()
+        vim.cmd("w")
+        local path = vim.api.nvim_buf_get_name(0)
+        if path:match("%.go$") or path:match("%.rs") or path:match("%.odin") then
+                local global_mp = vim.opt.makeprg:get() or ""
+                local local_mp = vim.api.nvim_get_option_value("makeprg", { scope = "local" }) or ""
+                if global_mp == "" and local_mp == "" then
+                        local new_makeprg = vim.fn.input("makeprg is unset. Enter command: ")
+                        if new_makeprg ~= "" then
+                                vim.api.nvim_set_option_value("makeprg", new_makeprg, { scope = "global" })
+                        end
+                end
+                vim.cmd("silent mak!")
+                if #vim.fn.getqflist() > 0 then
+                        vim.cmd("cope")
+                        vim.cmd("wincmd w")
+                else
+                        vim.cmd("cclo")
+                end
+        end
+        vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<ESC>", true, false, true), "n", true)
+end, { desc = "Save file then check" })
 
+-- Quickfix
+xplat_set("n", "{", function()
+        if #vim.fn.getqflist() == 1 then
+                vim.cmd("silent! cfirst")
+        else
+                vim.cmd("silent! cprev")
+        end
+end)
+
+xplat_set("n", "}", function()
+        if #vim.fn.getqflist() == 1 then
+                vim.cmd("silent! cfirst")
+        else
+                vim.cmd("silent! cnext")
+        end
+end)
 xplat_set("n", "H", "<nop>")
 
 -- Saving my right pinky
@@ -155,6 +190,7 @@ vim.keymap.set("n", "<C-Y><C-Y>", [["+yy]], { desc = "Yank line to system clipbo
 
 -- Add character to end of line
 xplat_set("n", ",", "mzA,<ESC>`z")
+xplat_set("n", ";", "mzA;<ESC>`z")
 
 vim.keymap.set({ "v", "x" }, "gW", function()
         local original_tw = vim.opt_local.textwidth:get()
@@ -246,7 +282,7 @@ vim.api.nvim_create_autocmd({ "BufWritePre" }, {
                 if ft == "lua" then
                         cmd = { "stylua", "-" }
                 elseif ft == "go" then
-                        cmd = { "gofumpt", "-extra" }
+                        cmd = { "goimports" }
                 -- WHY THE FUCK WOULD NEOVIM IMPLICITLY rs -> rust
                 elseif ft == "rust" then
                         cmd = { "rustfmt" }
@@ -441,7 +477,7 @@ do
         })
         local rules = {
                 Golang = {
-                        Function = [[^func +(?:\([a-zA-Z0-9_]+ +\*?[a-zA-Z0-9_]+\))? *[A-Z][a-zA-Z0-9_]* -- !*test* ]],
+                        Function = [[^func +(?:\([a-zA-Z0-9_]+ +\*?[a-zA-Z0-9_]+(?:\[.+\])?\))? *[A-Z][a-zA-Z0-9_]* -- !*test* ]],
                         Type = [[^type +[A-Z][a-zA-Z0-9_]+ -- !*test* ]],
                 },
                 Odin = {
@@ -452,7 +488,7 @@ do
                         -- We don't filter by file extension because Rust API searches often target
                         -- individual files, unlike Go or Odin, where the package system makes it
                         -- more common to search the entire directory.
-                        Function_and_Macro = [[(^\s*pub (const)? *fn (unsafe)? *[a-zA-Z0-9_#]+|^\s*macro_rules! [a-zA-Z0-9_#]+|^impl)]],
+                        Function_and_Macro = [[(^\s*pub (const )?(unsafe )?fn +[a-zA-Z0-9_#]+|^\s*macro_rules! [a-zA-Z0-9_#]+|^impl )]],
                         Type = [[^\s*pub (?:struct|union|enum|trait|type) [a-zA-Z0-9_#]+]],
                 },
         }
@@ -511,7 +547,7 @@ do
                                                 end
                                                 selected = selected[1]
                                                 if selected == "Any" then
-                                                        operation()
+                                                        fzf.live_grep()
                                                 else
                                                         operation({
                                                                 search = rules[programming_language][selected],
