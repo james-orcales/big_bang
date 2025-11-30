@@ -474,6 +474,7 @@ do
                                 ["shift-up"] = "half-page-up",
                                 ["home"] = "first",
                                 ["end"] = "last",
+                                ["ctrl-q"] = "select-all+accept",
                         },
                 },
                 actions = {
