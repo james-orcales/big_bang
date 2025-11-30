@@ -120,6 +120,10 @@ xplat_set("v", "<C-Up>", ":m '<-2<CR>gv=gv")
 xplat_set("n", "n", "nzzzv")
 xplat_set("n", "N", "Nzzzv")
 
+xplat_set("n", "mp", function()
+        local makeprg = vim.fn.input("Global makeprg: ")
+        vim.api.nvim_set_option_value("makeprg", makeprg, { scope = "global" })
+end)
 vim.keymap.set({ "v", "n", "i" }, "<C-E>", function()
         vim.cmd("w")
         local path = vim.api.nvim_buf_get_name(0)
@@ -223,12 +227,21 @@ vim.api.nvim_create_autocmd({ "FileType" }, {
 })
 
 vim.api.nvim_create_autocmd("QuickFixCmdPost", {
+        desc = "Sort quickfix list by line number",
+        group = vim.api.nvim_create_augroup("quickfix-sort", { clear = true }),
         callback = function()
                 local q = vim.fn.getqflist()
                 table.sort(q, function(a, b)
                         return a.bufnr == b.bufnr and a.lnum < b.lnum or a.bufnr < b.bufnr
                 end)
                 vim.fn.setqflist(q, "r")
+        end,
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+        pattern = "qf",
+        callback = function()
+                vim.cmd("resize 5")
         end,
 })
 
@@ -526,7 +539,7 @@ do
                         end
                 end
                 if programming_language == nil then
-                        operation()
+                        fzf.live_grep()
                         return
                 else
                         if not path:match("^oil://.*") and programming_language == "Rust" then
