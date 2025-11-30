@@ -149,15 +149,18 @@ end, { desc = "Save file then check" })
 
 -- Quickfix
 xplat_set("n", "{", function()
-        if #vim.fn.getqflist() == 1 then
-                vim.cmd("silent! cfirst")
+        local l = vim.fn.getqflist({ idx = 0 })
+        if l.idx == 1 then
+                vim.cmd("silent! clast")
         else
                 vim.cmd("silent! cprev")
         end
 end)
 
 xplat_set("n", "}", function()
-        if #vim.fn.getqflist() == 1 then
+        local idx = vim.fn.getqflist({ idx = 0 }).idx
+        local len = #vim.fn.getqflist()
+        if idx == len then
                 vim.cmd("silent! cfirst")
         else
                 vim.cmd("silent! cnext")
