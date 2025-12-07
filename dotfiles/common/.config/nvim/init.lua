@@ -166,6 +166,7 @@ xplat_set("n", "}", function()
                 vim.cmd("silent! cnext")
         end
 end)
+
 xplat_set("n", "H", "<nop>")
 
 -- Saving my right pinky
@@ -214,13 +215,11 @@ vim.api.nvim_create_autocmd({ "FileType" }, {
         group = vim.api.nvim_create_augroup("set_errorformat", { clear = true }),
         callback = function(ev)
                 if ev.match == "odin" then
-                        vim.opt_local.makeprg = "vendor/Odin/odin check"
-                        vim.opt_local.errorformat = "%f(%l:%v) %m"
+                        vim.opt_local.errorformat = "%f(%l:%v) %m,%-G%.%#"
                 elseif ev.match == "go" then
                         vim.opt_local.errorformat = "%f:%l:%v: %m"
                 elseif ev.match == "rust" then
                         vim.opt_local.makeprg = "cargo check"
-                        vim.opt_local.errorformat = "%Eerror[E%n]: %m,%Eerror: %m,%Wwarning: %m,%Inote: %m,%C %#--> %f:%l:%c,%-G%.%#"
                         vim.opt_local.errorformat = "%-Gerror: could not compile %.%#," --ignore
                                 .. "%-Gwarning: %.%# generated %.%#," --ignore
                                 .. "%Eerror[E%n]: %m,%Eerror: %m,%Wwarning: %m,%Inote: %m,"
@@ -299,7 +298,7 @@ vim.api.nvim_create_autocmd({ "BufWritePre" }, {
                         cmd = { "stylua", "-" }
                 elseif ft == "go" then
                         cmd = { "goimports" }
-                -- WHY THE FUCK WOULD NEOVIM IMPLICITLY rs -> rust
+                        -- WHY THE FUCK WOULD NEOVIM IMPLICITLY rs -> rust
                 elseif ft == "rust" then
                         cmd = { "rustfmt" }
                 end
@@ -501,6 +500,9 @@ do
                         Function = [[^[a-zA-Z0-9_]+ +:: +proc -- !*test* ]],
                         Type = [[^\w+ +:: +(?:struct|union|enum|distinct) -- !*test* ]],
                 },
+                Lua = {
+                        Function = [[(?:function [a-zA-Z0-9_]+\(|[a-zA-Z0-9_]+ = function\(|= def\()]],
+                },
                 Rust = {
                         -- We don't filter by file extension because Rust API searches often target
                         -- individual files, unlike Go or Odin, where the package system makes it
@@ -514,15 +516,18 @@ do
                         return "Golang"
                 elseif path:match("%.odin$") then
                         return "Odin"
+                elseif path:match("%.lua$") then
+                        return "Lua"
                 elseif path:match("%.rs$") or path:lower() == "cargo.toml" then
                         return "Rust"
                 end
                 return nil
         end
         local module_api_search = function()
-                local programming_language = nil
                 local path = vim.api.nvim_buf_get_name(0)
                 local operation = fzf.grep
+
+                local programming_language = nil
                 if not path:match("^oil://.*") then
                         programming_language = parse_programming_language(path)
                 else
@@ -546,7 +551,7 @@ do
                         fzf.live_grep()
                         return
                 else
-                        if not path:match("^oil://.*") and programming_language == "Rust" then
+                        if not path:match("^oil://.*") and (programming_language == "Rust" or programming_language == "Lua") then
                                 operation = fzf.grep_curbuf
                         end
                         local items = {}
