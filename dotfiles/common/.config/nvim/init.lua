@@ -207,6 +207,13 @@ vim.keymap.set({ "v", "x" }, "gW", function()
         vim.opt_local.textwidth = original_tw
 end, { desc = "Temporarily wrap selection to 100 columns" })
 
+xplat_set("n", "so", function()
+        if vim.g.syntax_on then
+                vim.cmd("syntax off")
+        else
+                vim.cmd("syntax on")
+        end
+end)
 -- === Autocmd ===
 
 --  Workflow is `:set mp=go\ test\ ./foo` -> `:mak`. This populates quickfix with errors.
