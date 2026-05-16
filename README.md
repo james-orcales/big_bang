@@ -1,5 +1,8 @@
 # big bang
 
+> [!NOTE]
+> This repo has been ported over to my monorepo  https://github.com/james-orcales/james-orcales
+
 thy dots and scripts
 
 ## Installation Script
